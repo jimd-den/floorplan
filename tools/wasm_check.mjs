@@ -5,7 +5,7 @@
 // Defaults: the debug .wasm and the debug native binary. The Makefile
 // `wasm` target builds both first. What it checks, for seeds
 // 0, 7, 42, 106, 199:
-//   - fp_version() is 1 and the module imports nothing.
+//   - fp_version() is 2 and the module imports nothing.
 //   - fp_house_json == the native `generate --json` text, exactly,
 //     for all six styles.
 //   - fp_house_mesh parses (magic, counts, table) and its vert/face
@@ -17,6 +17,10 @@
 //     materials in range) and its counts equal the native per-house
 //     OBJ counts plus one ground box per street and lot (2x2 only;
 //     3x3 is checked for internal consistency and determinism).
+//   - fp_chunk_json/fp_chunk_mesh carry their coordinates, parse and
+//     validate, are deterministic, and give distinct neighborhoods
+//     across coordinates. Chunk (0,0) is byte-identical to the v1
+//     neighborhood JSON and mesh.
 //   - Every payload is byte-identical across two calls, and an
 //     invalid style index returns a null pointer with length 0.
 //
@@ -58,7 +62,7 @@ const ex = instance.exports;
 const mem = () => new Uint8Array(ex.memory.buffer);
 const view = () => new DataView(ex.memory.buffer);
 
-check('fp_version is 1', ex.fp_version() === 1);
+check('fp_version is 2', ex.fp_version() === 2);
 
 function payload(ptr) {
   const len = ex.fp_last_len();
@@ -180,6 +184,37 @@ for (const seed of SEEDS) {
       check(`neighborhood mesh faces seed ${seed} ${blocks}`, m.faces === faces, `${m.faces} vs ${faces}`);
     }
   }
+
+  // Chunks (protocol v2): coordinates, validation, determinism,
+  // distinctness, and origin equivalence with v1.
+  const CHUNKS = [[0, 0], [1, 0], [0, 1], [-1, 2], [3, -1]];
+  const chunkPlans = [];
+  for (const [cx, cz] of CHUNKS) {
+    const cj = JSON.parse(readJson(ex.fp_chunk_json(seed, cx, cz)));
+    check(`chunk json coords seed ${seed} (${cx},${cz})`, cj.chunk[0] === cx && cj.chunk[1] === cz);
+    chunkPlans.push(JSON.stringify(cj.neighborhood));
+    const cp = payload(ex.fp_chunk_mesh(seed, cx, cz));
+    const cm = parseMesh(cp);
+    check(`chunk mesh magic seed ${seed} (${cx},${cz})`, cm.magic === 'FPM1');
+    check(`chunk mesh exact length seed ${seed} (${cx},${cz})`, cm.end === cm.total);
+    check(`chunk mesh indices in range seed ${seed} (${cx},${cz})`, [...cm.indices].every((i) => i < cm.verts));
+    check(`chunk mesh mat ids in range seed ${seed} (${cx},${cz})`, [...cm.matIds].every((i) => i < cm.materials));
+    const cp2 = payload(ex.fp_chunk_mesh(seed, cx, cz));
+    check(`chunk mesh deterministic seed ${seed} (${cx},${cz})`, Buffer.compare(Buffer.from(cp), Buffer.from(cp2)) === 0);
+  }
+  check(`chunks are distinct seed ${seed}`, new Set(chunkPlans).size === CHUNKS.length);
+  const origin = JSON.parse(readJson(ex.fp_chunk_json(seed, 0, 0)));
+  const fixed = JSON.parse(readJson(ex.fp_neighborhood_json(seed, 2, 2)));
+  check(
+    `chunk (0,0) is the fixed neighborhood seed ${seed}`,
+    JSON.stringify(origin.neighborhood) === JSON.stringify(fixed),
+  );
+  const originMesh = payload(ex.fp_chunk_mesh(seed, 0, 0));
+  const fixedMesh = payload(ex.fp_neighborhood_mesh(seed, 2, 2));
+  check(
+    `chunk (0,0) mesh is the fixed mesh seed ${seed}`,
+    Buffer.compare(Buffer.from(originMesh), Buffer.from(fixedMesh)) === 0,
+  );
 }
 
 // An invalid style index is refused, not a trap.

@@ -3,6 +3,7 @@
 //! Coordinates are metres. x runs east, y runs south (down in SVG).
 //! The front of the house is the south edge (largest y).
 
+pub mod chunk;
 pub mod furniture;
 pub mod geometry;
 pub mod haunt;

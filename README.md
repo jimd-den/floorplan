@@ -78,15 +78,41 @@ floorplan neighborhood --seed 42
 floorplan neighborhood --seed 42 --blocks 3x3 --out nb.svg --json nb.json
 ```
 
+## Streaming (M4)
+
+The neighborhood is unbounded. A **chunk** is one 2 × 2-block
+neighborhood derived only from the world seed and its coordinates
+(`use_cases::chunk`). Chunk (0,0) is the fixed neighborhood above,
+unchanged; other chunks are generated from a seed mixed from the
+world seed and `(cx, cz)` and translated to a 400 m grid.
+
+`use_cases::stream::Streamer` is a pure lifecycle state machine the
+shell advances once per frame: request the 3 × 3 ring, generate at
+most one chunk, install at most two, evict beyond two chunks away.
+A chunk about to be entered is installed before arrival, and a
+revisit rebuilds byte-identical content. The working set is bounded
+at 25 chunks, so memory plateaus. See ADR 0007.
+
+The WASM boundary exposes it as protocol v2:
+
+```text
+fp_chunk_json(seed, cx, cz)   chunk JSON: {chunk, state, neighborhood}
+fp_chunk_mesh(seed, cx, cz)   the chunk's FPM1 mesh
+```
+
+Every v1 export is unchanged. Chunk (0,0) embeds the fixed
+neighborhood's JSON and mesh byte-for-byte.
+
 ## WASM
 
 The core compiles to `wasm32-unknown-unknown` with zero crates and
 no wasm-bindgen — a thin adapter (`src/adapters/wasm.rs`) over the
 same generator. The web shell calls raw `extern "C"` exports and
-reads the results out of linear memory (protocol v1, see
-`docs/adr/0004-neighborhood-wasm.md`): `fp_version`,
+reads the results out of linear memory (protocol v2, see
+`docs/adr/0004-neighborhood-wasm.md` and `docs/adr/0007-streaming-chunks.md`): `fp_version`,
 `fp_alloc`/`fp_free`, `fp_last_len`, `fp_house_json`,
-`fp_neighborhood_json`, `fp_house_mesh`, `fp_neighborhood_mesh`.
+`fp_neighborhood_json`, `fp_house_mesh`, `fp_neighborhood_mesh`,
+`fp_chunk_json`, `fp_chunk_mesh`.
 JSON payloads are the same text the CLI writers emit; mesh payloads
 are a binary `FPM1` blob (positions, indices, material ids, material
 table). The built module is committed as base64 at
@@ -95,7 +121,7 @@ itself can't travel through this repo's text-only push path — and
 decodes back with one command:
 
 ```sh
-make wasm            # debug module + Node harness (364 checks vs native)
+make wasm            # debug module + Node harness (529 checks vs native)
 # Release module:
 RUSTFLAGS="-C panic=abort" cargo build --release --lib --target wasm32-unknown-unknown
 # Decode the committed copy back to the binary:

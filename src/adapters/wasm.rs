@@ -1,35 +1,36 @@
-//! WASM adapter: the core as a wasm32 module with no crates and
-//! no wasm-bindgen. The web shell calls raw `extern "C"` exports
-//! and reads the results out of linear memory.
+//! WASM adapter: the core as a wasm32 module with no crates and no
+//! wasm-bindgen. The web shell calls raw `extern "C"` exports (in
+//! `wasm_exports`) and reads the results out of linear memory.
 //!
-//! Memory protocol (see ADR 0004 for the full contract):
+//! Memory protocol (see ADR 0004 and ADR 0007):
 //! - `fp_alloc(size)` returns a pointer the caller owns; free it
 //!   with `fp_free(ptr, size)` when done.
 //! - Every payload export returns a pointer to its bytes and
 //!   records the length in `fp_last_len()`; a null pointer means
-//!   the call was refused (invalid argument) and the length is 0.
-//! - `fp_version()` returns the protocol version (1).
+//!   the call was refused and the length is 0.
+//! - `fp_version()` returns the protocol version (2).
 //! - JSON payloads are the same text the CLI writers emit.
 //! - Mesh payloads are the binary format `mesh_bytes` documents.
 //!
-//! The payload builders are plain Rust and tested natively; only
-//! the `extern "C"` exports are wasm-only. The module is built
-//! with `-C panic=abort`, so a bug traps instead of unwinding.
+//! The payload builders here are plain Rust and tested natively;
+//! only the `extern "C"` exports are wasm-only.
 
+use crate::adapters::chunk_json::render_chunk_json;
 use crate::adapters::json::render_json;
 use crate::adapters::neighborhood_json::render_neighborhood_json;
-use crate::domain::mesh::Mesh;
 use crate::domain::style::Style;
+use crate::use_cases::chunk::build_chunk;
 use crate::use_cases::extrude::extrude;
 use crate::use_cases::generate::generate_house;
 use crate::use_cases::neighborhood::generate_neighborhood;
 use crate::use_cases::neighborhood_mesh::neighborhood_mesh;
 
-/// The protocol version the shell checks against.
-pub const PROTOCOL_VERSION: u32 = 1;
+pub use crate::adapters::mesh_payload::{MESH_MAGIC, mesh_bytes};
 
-/// The mesh magic: "FPM1" (floorplan mesh, version 1).
-pub const MESH_MAGIC: [u8; 4] = *b"FPM1";
+/// The protocol version the shell checks against. Version 2 adds
+/// chunk generation by (seed, cx, cz) and light/daylight queries;
+/// every version 1 call keeps its semantics.
+pub const PROTOCOL_VERSION: u32 = 2;
 
 /// The style index the WASM exports take: `Style::all()` order
 /// (0 Ranch, 1 Colonial, 2 Craftsman, 3 Modern, 4 Cottage,
@@ -68,124 +69,22 @@ pub fn neighborhood_mesh_bytes(seed: u32, cols: u32, rows: u32) -> Result<Vec<u8
     Ok(mesh_bytes(&neighborhood_mesh(&generate_neighborhood(seed, (cols, rows)))))
 }
 
-/// The mesh binary format, all little-endian:
-/// - magic "FPM1" (4 bytes)
-/// - u32 vert_count, u32 face_count, u32 material_count
-/// - f32[vert_count * 3] positions (x, y, z)
-/// - u32[face_count * 3] indices
-/// - u32[face_count] material ids
-/// - material table: per material, u8 name_len, name bytes,
-///   f32[3] colour
-pub fn mesh_bytes(mesh: &Mesh) -> Vec<u8> {
-    let mut out = Vec::new();
-    out.extend_from_slice(&MESH_MAGIC);
-    out.extend_from_slice(&(mesh.vertices.len() as u32).to_le_bytes());
-    out.extend_from_slice(&(mesh.faces.len() as u32).to_le_bytes());
-    out.extend_from_slice(&(mesh.material_table.len() as u32).to_le_bytes());
-    for v in &mesh.vertices {
-        for c in v {
-            out.extend_from_slice(&c.to_le_bytes());
-        }
-    }
-    for f in &mesh.faces {
-        for i in f {
-            out.extend_from_slice(&i.to_le_bytes());
-        }
-    }
-    for m in &mesh.materials {
-        out.extend_from_slice(&m.to_le_bytes());
-    }
-    for mat in &mesh.material_table {
-        out.push(mat.name.len() as u8);
-        out.extend_from_slice(mat.name.as_bytes());
-        for c in mat.color {
-            out.extend_from_slice(&c.to_le_bytes());
-        }
-    }
-    out
+/// The JSON for one chunk of the infinite neighborhood: its
+/// coordinates, lifecycle state, and the neighborhood document.
+/// Chunk (0,0) carries the fixed neighborhood's JSON verbatim.
+pub fn chunk_json(seed: u32, cx: i32, cz: i32) -> Result<Vec<u8>, String> {
+    render_chunk_json(&build_chunk(seed, cx, cz))
+        .map(String::into_bytes)
+        .ok_or_else(|| "chunk has no content".to_string())
 }
 
-#[cfg(target_arch = "wasm32")]
-mod exports {
-    use super::*;
-    use std::sync::atomic::{AtomicU32, Ordering};
-
-    static LAST_LEN: AtomicU32 = AtomicU32::new(0);
-
-    /// Moves a payload into WASM linear memory and returns its
-    /// pointer; records its length for `fp_last_len`. A refused
-    /// call returns a null pointer and length 0.
-    fn leak_payload(result: Result<Vec<u8>, String>) -> *mut u8 {
-        match result {
-            Ok(bytes) => {
-                LAST_LEN.store(bytes.len() as u32, Ordering::Relaxed);
-                Box::leak(bytes.into_boxed_slice()).as_mut_ptr()
-            }
-            Err(_) => {
-                LAST_LEN.store(0, Ordering::Relaxed);
-                std::ptr::null_mut()
-            }
-        }
-    }
-
-    /// Allocates `size` bytes in linear memory. The caller owns
-    /// the pointer and frees it with `fp_free`.
-    #[unsafe(no_mangle)]
-    pub extern "C" fn fp_alloc(size: usize) -> *mut u8 {
-        Box::leak(vec![0u8; size].into_boxed_slice()).as_mut_ptr()
-    }
-
-    /// Frees a pointer previously returned by `fp_alloc` or a
-    /// payload export. `size` must be the size that was allocated.
-    #[unsafe(no_mangle)]
-    pub extern "C" fn fp_free(ptr: *mut u8, size: usize) {
-        if ptr.is_null() || size == 0 {
-            return;
-        }
-        unsafe {
-            let _ = Box::from_raw(std::slice::from_raw_parts_mut(ptr, size));
-        }
-    }
-
-    /// The length of the payload the last export returned, in
-    /// bytes. 0 after a refused call.
-    #[unsafe(no_mangle)]
-    pub extern "C" fn fp_last_len() -> u32 {
-        LAST_LEN.load(Ordering::Relaxed)
-    }
-
-    /// The protocol version (1).
-    #[unsafe(no_mangle)]
-    pub extern "C" fn fp_version() -> u32 {
-        PROTOCOL_VERSION
-    }
-
-    /// The house JSON for `seed` and a style index (see
-    /// `style_for_index`). Null on an invalid style index.
-    #[unsafe(no_mangle)]
-    pub extern "C" fn fp_house_json(seed: u32, style: u32) -> *mut u8 {
-        leak_payload(house_json(seed, style))
-    }
-
-    /// The neighborhood JSON for `seed` and a (columns, rows)
-    /// block count.
-    #[unsafe(no_mangle)]
-    pub extern "C" fn fp_neighborhood_json(seed: u32, cols: u32, rows: u32) -> *mut u8 {
-        leak_payload(neighborhood_json(seed, cols, rows))
-    }
-
-    /// The house mesh for `seed` and a style index, in the
-    /// binary format `mesh_bytes` documents. Null on an invalid
-    /// style index.
-    #[unsafe(no_mangle)]
-    pub extern "C" fn fp_house_mesh(seed: u32, style: u32) -> *mut u8 {
-        leak_payload(house_mesh_bytes(seed, style))
-    }
-
-    /// The neighborhood mesh for `seed` and a (columns, rows)
-    /// block count, in the binary format `mesh_bytes` documents.
-    #[unsafe(no_mangle)]
-    pub extern "C" fn fp_neighborhood_mesh(seed: u32, cols: u32, rows: u32) -> *mut u8 {
-        leak_payload(neighborhood_mesh_bytes(seed, cols, rows))
-    }
+/// The mesh for one chunk, in the binary format `mesh_bytes`
+/// documents. Chunk (0,0) is the fixed neighborhood's mesh.
+pub fn chunk_mesh_bytes(seed: u32, cx: i32, cz: i32) -> Result<Vec<u8>, String> {
+    let chunk = build_chunk(seed, cx, cz);
+    let neighborhood = chunk
+        .neighborhood
+        .as_ref()
+        .ok_or_else(|| "chunk has no content".to_string())?;
+    Ok(mesh_bytes(&neighborhood_mesh(neighborhood)))
 }

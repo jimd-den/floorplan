@@ -1,4 +1,5 @@
 pub mod camera;
+pub mod chunk_json;
 pub mod cli;
 pub mod cli_generate;
 pub mod cli_neighborhood;
@@ -8,6 +9,7 @@ pub mod cli_parse_render;
 pub mod cli_render;
 pub mod gltf;
 pub mod json;
+pub mod mesh_payload;
 pub mod neighborhood_json;
 pub mod neighborhood_svg;
 pub mod obj;
@@ -16,3 +18,5 @@ pub mod render;
 pub mod svg;
 pub mod svg_openings;
 pub mod wasm;
+#[cfg(target_arch = "wasm32")]
+pub mod wasm_exports;

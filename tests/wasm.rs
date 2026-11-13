@@ -5,7 +5,8 @@
 use floorplan::adapters::json::render_json;
 use floorplan::adapters::neighborhood_json::render_neighborhood_json;
 use floorplan::adapters::wasm::{
-    MESH_MAGIC, house_json, house_mesh_bytes, mesh_bytes, neighborhood_json, neighborhood_mesh_bytes,
+    MESH_MAGIC, PROTOCOL_VERSION, chunk_json, chunk_mesh_bytes, house_json, house_mesh_bytes,
+    mesh_bytes, neighborhood_json, neighborhood_mesh_bytes,
 };
 use floorplan::domain::style::Style;
 use floorplan::use_cases::extrude::extrude;
@@ -113,4 +114,34 @@ fn an_invalid_style_index_is_refused() {
     assert!(house_json(42, 6).is_err());
     assert!(house_mesh_bytes(42, 99).is_err());
     assert!(house_json(42, 5).is_ok(), "Townhouse is index 5");
+}
+
+#[test]
+fn protocol_version_two_adds_chunks_without_breaking_v1() {
+    assert_eq!(PROTOCOL_VERSION, 2);
+    let v1 = neighborhood_json(42, 2, 2).unwrap();
+    let chunk = chunk_json(42, 0, 0).unwrap();
+    let text = String::from_utf8(chunk).unwrap();
+    assert!(text.contains("\"chunk\":[0,0]"));
+    assert!(
+        text.contains(&String::from_utf8(v1).unwrap()),
+        "chunk (0,0) must embed the fixed neighborhood verbatim"
+    );
+}
+
+#[test]
+fn chunk_mesh_for_the_origin_is_the_fixed_neighborhood_mesh() {
+    assert_eq!(chunk_mesh_bytes(42, 0, 0).unwrap(), neighborhood_mesh_bytes(42, 2, 2).unwrap());
+}
+
+#[test]
+fn a_chunk_mesh_parses_back_and_is_deterministic() {
+    let bytes = chunk_mesh_bytes(42, 1, 0).unwrap();
+    let (vs, fs, ms, table) = parse_mesh(&bytes);
+    assert!(!vs.is_empty());
+    assert!(!fs.is_empty());
+    assert!(fs.iter().flatten().all(|&i| (i as usize) < vs.len()));
+    assert!(ms.iter().all(|&m| (m as usize) < table.len()));
+    assert_eq!(bytes, chunk_mesh_bytes(42, 1, 0).unwrap());
+    assert_ne!(bytes, chunk_mesh_bytes(42, 2, 0).unwrap());
 }
