@@ -5,6 +5,7 @@
 
 pub mod furniture;
 pub mod geometry;
+pub mod haunt;
 pub mod interaction;
 pub mod layout;
 pub mod mesh;

@@ -103,6 +103,28 @@ base64 -d wasm/floorplan.wasm.b64 > floorplan.wasm
 # tools/wasm_check.mjs --wasm <path> --bin <native binary> verifies a build.
 ```
 
+## Fear engine (M5)
+
+The procedural sandbox horror layer is a **dial, not a story**. Pure
+use cases over `DreadState` (SRD-001 §4.2, ADR 0005):
+
+- **Dread** rises from darkness and time spent in it, falls from light
+  and from completed routine tasks. `DreadRung` (`Calm < Unease <
+  Wrong < Event`) classifies 0–100 once, in the domain.
+- **The dial** caps what the engine may spend: 0 is silent and freezes
+  dread, 1–33 spends unease details, 34–66 wrong details, 67–100 event
+  details.
+- **Tasks** name real rooms and furniture in the house being played
+  (`CheckLights`, `RestorePower`, `Catalog`, `CloseDoors`); a kind with
+  no target is skipped, never invented.
+- **Wrong details** are seed-derived (`DoorAjar`, `ChairMoved`,
+  `LampOn`, `LightFlicker`) and append-only in the event log.
+
+The shell supplies the systems (darkness, dark minutes, tasks done,
+light relief) as data — M3 light play will fill those values without
+changing the interface. `tests/haunt.rs` proves the dial-0 property
+over 10 seeds × 100 actions.
+
 ## Room-size caps
 
 Bath is capped at 6 sq m and study at 12 sq m. Over-cap leaves are
