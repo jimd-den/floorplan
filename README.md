@@ -42,15 +42,28 @@ buffer embedded as base64) — not voxels.
 - **Walls** are boxes (0.15 m thick, 2.7 m per storey) split around
   real openings: a door/window is an actual gap in the wall, with
   a lintel above it and a sill below windows. Opening honesty is
-  tested geometrically over 200 seeds.
+  tested geometrically over 200 seeds. Exterior walls are siding;
+  interior walls get a painted lining, baseboards, and door frames.
 - **Per floor**: a floor slab and a ceiling slab per room.
   **Stairs** for two-storey houses are solid stepped boxes in the
-  ground hall. **Roof**: a flat slab cap — the top floor's ceiling
-  and any exposed ground ceiling (e.g. over the garage). **A
-  pitched roof is explicitly out of scope**; it is not built.
+  ground hall.
+- **Roof**: a pitched gable over the footprint and garage, with a
+  0.4 m eave overhang and the ridge on the long axis; gable ends are
+  siding. The top floor keeps an interior ceiling under it. A porch
+  gets its own roof, posts, and steps.
+- **Windows and doors**: four-member window frames with a glass pane,
+  two jambs and a head per door, so an opening reads as a window or a
+  door from both sides.
+- **Grounds** (neighborhood mesh): a driveway pad on the garage side
+  with a connector to the street where the route is clear, and one or
+  two trees per lot in the back yard.
 - **Materials**: one per room program (living, kitchen, dining,
   bedroom, bath, hall, entry, study, laundry, garage) plus
-  wall/ceiling/roof/stairs/porch.
+  wall/ceiling/roof/stairs/porch, siding, trim, window frame, glass,
+  baseboard, door frame, driveway, trunk, leaf, and clutter.
+- **Budget**: a house stays under 7,000 vertices / 10,000 faces and
+  the 2×2 neighborhood under 90,000 / 140,000, guarded by
+  `tests/mesh_budget.rs`.
 
 ```sh
 floorplan generate --seed 42 --style modern --obj house.obj --gltf house.gltf
@@ -117,12 +130,12 @@ reads the results out of linear memory (protocol v2, see
 JSON payloads are the same text the CLI writers emit; mesh payloads
 are a binary `FPM1` blob (positions, indices, material ids, material
 table). The built module is committed as base64 at
-`wasm/floorplan.wasm.b64` (release, 218,419 bytes) — the binary
+`wasm/floorplan.wasm.b64` (release, 257,357 bytes) — the binary
 itself can't travel through this repo's text-only push path — and
 decodes back with one command:
 
 ```sh
-make wasm            # debug module + Node harness (529 checks vs native)
+make wasm            # debug module + Node harness (550 checks vs native)
 # Release module:
 RUSTFLAGS="-C panic=abort" cargo build --release --lib --target wasm32-unknown-unknown
 # Decode the committed copy back to the binary:
@@ -143,10 +156,20 @@ floorplan render --seed 42 --style modern --view interior --out in.png
 floorplan render --seed 42 --view street --blocks 2x2 --out street.png
 ```
 
-Views are `exterior` (centred on the footprint), `interior` (the
-largest ground-floor room, standing clear of furniture), and `street`
-(the busiest street, looking along it). Output is 1280×720, default
-`render-<seed>-<view>.png`. `docs/screenshots/` holds seed 42.
+Views are `exterior` (a three-quarter view of the footprint), `interior`
+(the largest ground-floor room, standing clear of furniture), and
+`street` (the busiest street, looking along it). Output is 1280×720,
+default `render-<seed>-<view>.png`. `docs/screenshots/` holds:
+
+- `seed42-modern-exterior.png` — gable roof, siding, framed windows.
+- `seed42-modern-interior.png` — painted walls, baseboards, window,
+  door frame, table and clutter.
+- `seed42-neighborhood-street.png` — the M6 neighborhood, with trees.
+- `seed0-colonial-exterior.png` — two storeys and a porch with steps,
+  posts, and its own roof.
+
+The M6 pass is ADR 0009; the screenshots regenerate from the same
+binary with the commands above.
 
 ## Fear engine (M5)
 

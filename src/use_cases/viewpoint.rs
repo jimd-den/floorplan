@@ -43,16 +43,17 @@ pub fn house_pose(house: &House, view: View) -> Pose {
     }
 }
 
-/// Stands outside the front of the house at standing height and looks
-/// at the middle of it. The front is the south edge, so the eye is
-/// south of the extent; the distance grows with the width so a wide
-/// house still fits the frame.
+/// Stands south-east of the front at standing height and looks at the
+/// middle of it. The front is the south edge, so the eye is south of
+/// the extent; the lateral offset makes a three-quarter view, so the
+/// roof and one side read rather than a flat elevation.
 fn exterior_pose(house: &House) -> Pose {
     let extent = house_extent(house);
     let cx = (extent.w / 2.0) as f32;
     let back = (extent.w * 0.55).max(6.0) as f32;
+    let side = (extent.w * 0.35).max(2.0) as f32;
     Pose {
-        eye: [cx, 1.7, extent.bottom() as f32 + back],
+        eye: [cx + side, 1.7, extent.bottom() as f32 + back],
         target: [cx, 1.4, (extent.d / 2.0) as f32],
     }
 }

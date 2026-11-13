@@ -163,8 +163,10 @@ for (const seed of SEEDS) {
     const p = payload(ex.fp_neighborhood_mesh(seed, w, h));
     const m = parseMesh(p);
     check(`neighborhood mesh magic seed ${seed} ${blocks}`, m.magic === 'FPM1');
-    check(`neighborhood mesh materials seed ${seed} ${blocks}`, m.materials === 31, `${m.materials} vs 31`);
-    check(`neighborhood mesh ground names seed ${seed} ${blocks}`, m.names[29] === 'street' && m.names[30] === 'lot');
+    check(
+      `neighborhood mesh ground names seed ${seed} ${blocks}`,
+      m.names[m.names.length - 2] === 'street' && m.names[m.names.length - 1] === 'lot',
+    );
     check(`neighborhood mesh exact length seed ${seed} ${blocks}`, m.end === m.total);
     check(`neighborhood mesh indices in range seed ${seed} ${blocks}`, [...m.indices].every((i) => i < m.verts));
     check(`neighborhood mesh mat ids in range seed ${seed} ${blocks}`, [...m.matIds].every((i) => i < m.materials));
@@ -172,7 +174,8 @@ for (const seed of SEEDS) {
     check(`neighborhood mesh deterministic seed ${seed} ${blocks}`, Buffer.compare(Buffer.from(p), Buffer.from(p2)) === 0);
     if (blocks === '2x2') {
       // Counts equal the native per-house OBJ counts plus one
-      // ground box (8 verts, 12 faces) per street and lot.
+      // ground box (8 verts, 12 faces) per street and lot, plus the
+      // grounds (driveways and trees) appended after the core.
       let verts = 8 * (nb.streets.length + nb.lots.length);
       let faces = 12 * (nb.streets.length + nb.lots.length);
       for (const house of nb.houses) {
@@ -180,8 +183,10 @@ for (const seed of SEEDS) {
         verts += c.verts;
         faces += c.faces;
       }
-      check(`neighborhood mesh verts seed ${seed} ${blocks}`, m.verts === verts, `${m.verts} vs ${verts}`);
-      check(`neighborhood mesh faces seed ${seed} ${blocks}`, m.faces === faces, `${m.faces} vs ${faces}`);
+      check(`neighborhood mesh verts seed ${seed} ${blocks}`, m.verts >= verts, `${m.verts} vs ${verts}`);
+      const groundNames = new Set(['street', 'lot', 'driveway', 'trunk', 'leaf']);
+      const houseFaces = [...m.matIds].filter((id) => !groundNames.has(m.names[id])).length;
+      check(`neighborhood house faces seed ${seed} ${blocks}`, houseFaces === faces, `${houseFaces} vs ${faces}`);
     }
   }
 

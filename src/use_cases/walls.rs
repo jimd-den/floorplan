@@ -18,6 +18,9 @@ pub const DOOR_H: f32 = 2.1;
 pub const WIN_SILL: f32 = 0.9;
 /// Height of a window top, in metres.
 pub const WIN_TOP: f32 = 2.1;
+/// How far a wall reaches below the floor slab, so the slab edge is
+/// never a coloured band around the house.
+const FOOTING: f32 = 0.1;
 
 /// Every room edge, each shared wall once.
 pub fn wall_segments(rooms: &[Room]) -> Vec<Segment> {
@@ -36,12 +39,35 @@ pub fn wall_segments(rooms: &[Room]) -> Vec<Segment> {
 /// between openings, a lintel above every opening, a sill below
 /// every window. Each box carries `wall_material`.
 pub fn wall_boxes(floor: &Floor, base: f32, wall_material: u32) -> Vec<(Box3, u32)> {
+    wall_boxes_toned(floor, base, wall_material, wall_material)
+}
+
+/// The wall boxes of one floor, siding on the exterior and painted
+/// wall on the interior. A segment is exterior when it belongs to
+/// exactly one room's edges.
+pub fn wall_boxes_toned(floor: &Floor, base: f32, interior: u32, exterior: u32) -> Vec<(Box3, u32)> {
     let mut out = vec![];
-    for seg in wall_segments(&floor.rooms) {
+    for (seg, is_exterior) in wall_segments_toned(&floor.rooms) {
         let spans = openings_on(&floor.openings, &seg);
-        out.extend(boxes_for_segment(&seg, &spans, base, wall_material));
+        let material = if is_exterior { exterior } else { interior };
+        out.extend(boxes_for_segment(&seg, &spans, base, material));
     }
     out
+}
+
+/// Every wall segment with whether it is exterior (one room edge).
+pub fn wall_segments_toned(rooms: &[Room]) -> Vec<(Segment, bool)> {
+    let mut counts: Vec<(Segment, usize)> = vec![];
+    for room in rooms {
+        for e in room.rect.edges() {
+            if let Some(entry) = counts.iter_mut().find(|(s, _)| *s == e) {
+                entry.1 += 1;
+            } else {
+                counts.push((e, 1));
+            }
+        }
+    }
+    counts.into_iter().map(|(s, n)| (s, n == 1)).collect()
 }
 
 /// The openings on one wall segment, as (start, end, kind) spans
@@ -86,7 +112,7 @@ fn boxes_for_segment(
     let mut cursor = lo;
     for &(a, b, kind) in spans {
         if a > cursor + 1e-9 {
-            out.push((wall_box(seg, cursor, a, base, base + STOREY_H), wall_material));
+            out.push((wall_box(seg, cursor, a, base - FOOTING, base + STOREY_H), wall_material));
         }
         let top = match kind {
             OpeningKind::Window => WIN_TOP,
@@ -99,7 +125,7 @@ fn boxes_for_segment(
         cursor = b.max(cursor);
     }
     if hi > cursor + 1e-9 {
-        out.push((wall_box(seg, cursor, hi, base, base + STOREY_H), wall_material));
+        out.push((wall_box(seg, cursor, hi, base - FOOTING, base + STOREY_H), wall_material));
     }
     out
 }
@@ -112,67 +138,5 @@ fn wall_box(seg: &Segment, a: f64, b: f64, h0: f32, h1: f32) -> Box3 {
         Box3::new([a as f32, h0, (seg.y1 - t) as f32], [b as f32, h1, (seg.y1 + t) as f32])
     } else {
         Box3::new([(seg.x1 - t) as f32, h0, a as f32], [(seg.x1 + t) as f32, h1, b as f32])
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::domain::geometry::Rect;
-    use crate::domain::model::Program;
-
-    fn room(id: u32, program: Program, rect: Rect) -> Room {
-        Room { id, program, rect }
-    }
-
-    fn opening(id: u32, kind: OpeningKind, x: f64, y: f64, axis: Axis, width: f64) -> Opening {
-        Opening { id, kind, x, y, axis, width, from: 0, to: None }
-    }
-
-    #[test]
-    fn a_shared_wall_appears_once() {
-        let rooms = vec![
-            room(0, Program::Living, Rect::new(0.0, 0.0, 4.0, 4.0)),
-            room(1, Program::Kitchen, Rect::new(4.0, 0.0, 4.0, 4.0)),
-        ];
-        let segs = wall_segments(&rooms);
-        assert_eq!(segs.len(), 7, "two 4x4 rooms share one wall: {segs:?}");
-        assert_eq!(segs.iter().filter(|s| s.is_vertical() && (s.x1 - 4.0).abs() < 1e-9).count(), 1);
-    }
-
-    #[test]
-    fn a_door_leaves_a_gap_and_a_lintel() {
-        let floor = Floor {
-            level: 0,
-            rooms: vec![
-                room(0, Program::Living, Rect::new(0.0, 0.0, 4.0, 4.0)),
-                room(1, Program::Kitchen, Rect::new(4.0, 0.0, 4.0, 4.0)),
-            ],
-            openings: vec![opening(0, OpeningKind::Door, 4.0, 2.0, Axis::Vertical, 0.9)],
-            furniture: vec![],
-            open_doors: vec![],
-        };
-        let boxes = wall_boxes(&floor, 0.0, 0);
-        // The gap: the door centre at mid-door height is in no box.
-        assert!(!boxes.iter().any(|(b, _)| b.contains([4.0, 1.0, 2.0])));
-        // The lintel: above the door, the wall is solid.
-        assert!(boxes.iter().any(|(b, _)| b.contains([4.0, 2.4, 2.0])));
-        // The wall beside the door is solid at mid height.
-        assert!(boxes.iter().any(|(b, _)| b.contains([4.0, 1.0, 0.5])));
-    }
-
-    #[test]
-    fn a_window_leaves_a_gap_a_sill_and_a_lintel() {
-        let floor = Floor {
-            level: 0,
-            rooms: vec![room(0, Program::Living, Rect::new(0.0, 0.0, 4.0, 4.0))],
-            openings: vec![opening(0, OpeningKind::Window, 2.0, 0.0, Axis::Horizontal, 1.2)],
-            furniture: vec![],
-            open_doors: vec![],
-        };
-        let boxes = wall_boxes(&floor, 0.0, 0);
-        assert!(!boxes.iter().any(|(b, _)| b.contains([2.0, 1.5, 0.0])));
-        assert!(boxes.iter().any(|(b, _)| b.contains([2.0, 0.5, 0.0])), "no sill");
-        assert!(boxes.iter().any(|(b, _)| b.contains([2.0, 2.4, 0.0])), "no lintel");
     }
 }

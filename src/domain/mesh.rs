@@ -80,6 +80,27 @@ impl Mesh {
         }
     }
 
+    /// Adds one triangle in `material`.
+    pub fn add_triangle(&mut self, a: [f32; 3], b: [f32; 3], c: [f32; 3], material: u32) {
+        let base = self.vertices.len() as u32;
+        self.vertices.extend([a, b, c]);
+        self.faces.push([base, base + 1, base + 2]);
+        self.materials.push(material);
+    }
+
+    /// Adds a quad as two triangles, all in `material`.
+    pub fn add_quad(
+        &mut self,
+        a: [f32; 3],
+        b: [f32; 3],
+        c: [f32; 3],
+        d: [f32; 3],
+        material: u32,
+    ) {
+        self.add_triangle(a, b, c, material);
+        self.add_triangle(a, c, d, material);
+    }
+
     /// Every face indexes a real vertex, has three distinct corners,
     /// and covers a non-zero area; every material id is in the table.
     pub fn validate(&self) -> Result<(), String> {

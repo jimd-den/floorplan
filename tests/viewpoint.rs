@@ -27,13 +27,13 @@ fn the_exterior_stands_south_of_the_house_and_looks_in() {
 }
 
 #[test]
-fn the_exterior_is_centred_on_the_footprint() {
+fn the_exterior_is_a_three_quarter_view_of_the_centred_footprint() {
     let house = modern();
     let extent = house_extent(&house);
     let Pose { eye, target } = house_pose(&house, View::Exterior);
 
-    assert!((eye[0] - extent.w as f32 / 2.0).abs() < 0.01, "eye must be centred");
     assert!((target[0] - extent.w as f32 / 2.0).abs() < 0.01, "target must be centred");
+    assert!((eye[0] - extent.w as f32 / 2.0).abs() >= 2.0, "eye must stand off to one side");
     assert!((eye[2] as f64 - extent.bottom()) >= 6.0, "eye must stand back");
 }
 

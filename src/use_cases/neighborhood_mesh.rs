@@ -11,6 +11,7 @@ use crate::domain::geometry::Rect;
 use crate::domain::mesh::{Box3, Material, Mesh};
 use crate::domain::neighborhood::{Neighborhood, PlacedHouse, house_extent};
 use crate::use_cases::extrude::{extrude, material_table};
+use crate::use_cases::grounds::add_grounds;
 
 /// The street material id, appended after the house table.
 pub const STREET_MATERIAL: u32 = 29;
@@ -50,6 +51,7 @@ pub fn neighborhood_mesh(n: &Neighborhood) -> Mesh {
             LOT_MATERIAL,
         );
     }
+    add_grounds(&mut mesh, n);
     mesh
 }
 
@@ -107,10 +109,16 @@ mod tests {
             verts += hm.vertices.len();
             faces += hm.faces.len();
         }
-        assert_eq!(mesh.vertices.len(), verts, "vertex count");
-        assert_eq!(mesh.faces.len(), faces, "face count");
-        assert_eq!(mesh.materials.len(), faces, "material count");
-        assert_eq!(mesh.material_table.len(), 31, "29 house + street + lot");
+        // The house, street, and lot core is exact; grounds append
+        // driveways and trees after it.
+        assert!(mesh.vertices.len() >= verts, "vertex count");
+        assert!(mesh.faces.len() >= faces, "face count");
+        assert_eq!(mesh.materials.len(), mesh.faces.len(), "material count");
+        assert_eq!(
+            mesh.material_table.len(),
+            crate::use_cases::materials::material_table().len() + 2,
+            "house materials plus street and lot"
+        );
     }
 
     #[test]
@@ -159,6 +167,6 @@ mod tests {
             .map(|v| v[1])
             .collect();
         assert!(!ground.is_empty(), "no ground vertices");
-        assert!(ground.iter().all(|&y| y <= -0.02 + 1e-6), "ground pokes above -0.02");
+        assert!(ground.iter().all(|&y| y < 0.0), "ground pokes above the house floors");
     }
 }
