@@ -4,8 +4,9 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 
 use crate::adapters::wasm::{
-    PROTOCOL_VERSION, chunk_json, chunk_mesh_bytes, daylight_json, house_json,
-    house_lights_json, house_lights_toggled_json, house_mesh_bytes, light_toggle_state,
+    HauntStepInput, PROTOCOL_VERSION, chunk_json, chunk_mesh_bytes, daylight_json,
+    haunt_step_json, house_interact_mesh_bytes, house_json, house_lights_json,
+    house_lights_toggled_json, house_mesh_bytes, house_tasks_json, light_toggle_state,
     neighborhood_json, neighborhood_mesh_bytes,
 };
 
@@ -122,4 +123,55 @@ pub extern "C" fn fp_daylight(minutes: u32, held: u32) -> *mut u8 {
 #[unsafe(no_mangle)]
 pub extern "C" fn fp_light_toggle_state(code: u32) -> i32 {
     light_toggle_state(code).map_or(-1, |next| next as i32)
+}
+
+/// The home-fixing tasks generated for a house, as JSON.
+#[unsafe(no_mangle)]
+pub extern "C" fn fp_house_tasks(seed: u32, style: u32) -> *mut u8 {
+    leak_payload(house_tasks_json(seed, style))
+}
+
+/// Runs one coupled light + fear-engine step and returns the dread
+/// state and spent wrong-detail events as JSON.
+#[allow(clippy::too_many_arguments)]
+#[unsafe(no_mangle)]
+pub extern "C" fn fp_haunt_step(
+    seed: u32,
+    style: u32,
+    dial: u32,
+    level: u32,
+    room_id: u32,
+    carrying_flashlight: u32,
+    daylight_minutes: u32,
+    tick: u32,
+    dark_minutes_tenths: u32,
+    tasks_done: u32,
+) -> *mut u8 {
+    leak_payload(haunt_step_json(HauntStepInput {
+        seed,
+        style_index: style,
+        dial: dial.min(100) as u8,
+        level: level.min(100) as u8,
+        room_id,
+        carrying_flashlight: carrying_flashlight != 0,
+        daylight_minutes,
+        tick: tick as u64,
+        dark_minutes: dark_minutes_tenths as f64 / 10.0,
+        tasks_done,
+    }))
+}
+
+/// Applies an interaction command (`0` open door, `1` close door,
+/// `2` toggle lamp, `3` toggle light, `4` move furniture) and returns
+/// the updated `FPM1` house mesh. Null when refused.
+#[unsafe(no_mangle)]
+pub extern "C" fn fp_house_interact_mesh(
+    seed: u32,
+    style: u32,
+    cmd_kind: u32,
+    target_id: u32,
+    x_cm: i32,
+    y_cm: i32,
+) -> *mut u8 {
+    leak_payload(house_interact_mesh_bytes(seed, style, cmd_kind, target_id, x_cm, y_cm))
 }

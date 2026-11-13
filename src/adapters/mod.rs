@@ -8,6 +8,7 @@ pub mod cli_parse_neighborhood;
 pub mod cli_parse_render;
 pub mod cli_render;
 pub mod gltf;
+pub mod haunt_json;
 pub mod json;
 pub mod light_json;
 pub mod mesh_payload;

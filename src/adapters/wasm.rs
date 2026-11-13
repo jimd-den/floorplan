@@ -28,6 +28,9 @@ use crate::use_cases::generate::generate_house;
 use crate::use_cases::neighborhood::generate_neighborhood;
 use crate::use_cases::neighborhood_mesh::neighborhood_mesh;
 
+pub use crate::adapters::haunt_json::{
+    HauntStepInput, haunt_step_json, house_interact_mesh_bytes, house_tasks_json,
+};
 pub use crate::adapters::mesh_payload::{MESH_MAGIC, mesh_bytes};
 
 /// The protocol version the shell checks against. Version 2 adds
