@@ -9,6 +9,7 @@
 
 use crate::adapters::cli_parse::parse_args;
 use crate::domain::style::Style;
+use crate::use_cases::viewpoint::View;
 
 /// What the user asked for.
 #[derive(Debug, Clone, PartialEq)]
@@ -37,6 +38,15 @@ pub enum Command {
         /// Some(Some(path)): JSON to that path.
         json: Option<Option<String>>,
     },
+    /// First-person screenshot: a house or a street, as a PNG.
+    Render {
+        seed: u32,
+        style: Option<Style>,
+        view: View,
+        /// (columns, rows) of blocks; used by the street view.
+        blocks: (u32, u32),
+        out: Option<String>,
+    },
 }
 
 /// Runs the CLI, returning the process exit code.
@@ -64,6 +74,15 @@ pub fn run(args: &[String]) -> i32 {
         }
         Ok(Command::Neighborhood { seed, blocks, out, json }) => {
             match crate::adapters::cli_neighborhood::neighborhood(seed, blocks, out, json) {
+                Ok(()) => 0,
+                Err(e) => {
+                    eprintln!("floorplan: {e}");
+                    1
+                }
+            }
+        }
+        Ok(Command::Render { seed, style, view, blocks, out }) => {
+            match crate::adapters::cli_render::render(seed, style, view, blocks, out) {
                 Ok(()) => 0,
                 Err(e) => {
                     eprintln!("floorplan: {e}");

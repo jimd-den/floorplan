@@ -42,7 +42,7 @@ pub fn parse_neighborhood(rest: Vec<&String>) -> Result<Command, String> {
 }
 
 /// Parses `WxH` into (columns, rows), each 1..=10.
-fn parse_blocks(v: &str) -> Result<(u32, u32), String> {
+pub(crate) fn parse_blocks(v: &str) -> Result<(u32, u32), String> {
     let (a, b) = v.split_once('x').ok_or_else(|| format!("--blocks must be WxH, got {v}"))?;
     let w: u32 = a.parse().map_err(|_| format!("--blocks must be WxH, got {v}"))?;
     let h: u32 = b.parse().map_err(|_| format!("--blocks must be WxH, got {v}"))?;

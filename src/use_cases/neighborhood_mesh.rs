@@ -21,7 +21,7 @@ pub const LOT_MATERIAL: u32 = 30;
 /// plus street asphalt and lot grass.
 pub fn neighborhood_material_table() -> Vec<Material> {
     let mut table = material_table();
-    table.push(Material { name: "street", color: [0.25, 0.25, 0.27] });
+    table.push(Material { name: "street", color: [0.34, 0.34, 0.36] });
     table.push(Material { name: "lot", color: [0.45, 0.62, 0.38] });
     table
 }

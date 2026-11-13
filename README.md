@@ -103,6 +103,24 @@ base64 -d wasm/floorplan.wasm.b64 > floorplan.wasm
 # tools/wasm_check.mjs --wasm <path> --bin <native binary> verifies a build.
 ```
 
+## Screenshots
+
+`floorplan render` draws a first-person PNG of a house or a street with
+a std-only software rasterizer — no browser, no crates. It is an
+inspection tool, not the runtime renderer; the WASM shell still draws
+the frames (ADR 0006).
+
+```sh
+floorplan render --seed 42 --style modern --view exterior
+floorplan render --seed 42 --style modern --view interior --out in.png
+floorplan render --seed 42 --view street --blocks 2x2 --out street.png
+```
+
+Views are `exterior` (centred on the footprint), `interior` (the
+largest ground-floor room, standing clear of furniture), and `street`
+(the busiest street, looking along it). Output is 1280×720, default
+`render-<seed>-<view>.png`. `docs/screenshots/` holds seed 42.
+
 ## Fear engine (M5)
 
 The procedural sandbox horror layer is a **dial, not a story**. Pure

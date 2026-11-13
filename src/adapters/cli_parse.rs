@@ -20,8 +20,13 @@ pub fn parse_args(args: &[String]) -> Result<Command, String> {
     if first == "neighborhood" {
         return crate::adapters::cli_parse_neighborhood::parse_neighborhood(it.collect());
     }
+    if first == "render" {
+        return crate::adapters::cli_parse_render::parse_render(it.collect());
+    }
     if first != "generate" {
-        return Err(format!("unknown command: {first} (expected generate, neighborhood, or --list-styles)"));
+        return Err(format!(
+            "unknown command: {first} (expected generate, neighborhood, render, or --list-styles)"
+        ));
     }
     let mut seed: Option<u32> = None;
     let mut style = None;
@@ -90,7 +95,7 @@ pub(crate) fn value(rest: &[&String], i: &mut usize, flag: &str) -> Result<Strin
     Ok(rest[*i].clone())
 }
 
-fn style_list() -> String {
+pub(crate) fn style_list() -> String {
     Style::all().iter().map(|s| s.id()).collect::<Vec<_>>().join(", ")
 }
 

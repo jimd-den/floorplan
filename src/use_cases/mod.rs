@@ -26,6 +26,7 @@ pub mod placement;
 pub mod repair;
 pub mod repair_window;
 pub mod retile;
+pub mod scene;
 pub mod doors;
 pub mod footprint;
 pub mod garage;
@@ -35,6 +36,7 @@ pub mod neighborhood_mesh;
 pub mod programs;
 pub mod upper;
 pub mod variety;
+pub mod viewpoint;
 pub mod walls;
 pub mod windows;
 
