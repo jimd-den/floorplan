@@ -60,14 +60,16 @@ floorplan generate --seed 42 --style modern --obj house.obj --gltf house.gltf
 
 ## Neighborhoods
 
-A street grid on top of the same house generator — no second house
-generator. Streets (8 m, at least one through-street plus cross
-streets), lots along the streets with setbacks (front 5 m, back
-3 m, sides 2 m), one house per lot, each facing its street. Lot
-size biases the style: small lots get Cottage/Townhouse, wide lots
-get Ranch/Colonial/Modern/Craftsman. Every house fits its lot (the
-maximum house extent is 26 × 16 m); every lot has street frontage;
-no two houses overlap. The default is 2 × 2 blocks, ~16–24 houses.
+Random layouts on top of the same house generator — no second house
+generator. Three layout families (grid, offset, cul-de-sac), picked
+by `seed % 3`, each with its own street pattern. Streets (8 m, at
+least one through-street plus cross streets), lots along the streets
+with setbacks (front 5 m, back 3 m, sides 2 m), one house per lot,
+each facing its street. Lot size biases the style: small lots get
+Cottage/Townhouse, wide lots get Ranch/Colonial/Modern/Craftsman.
+Every house fits its lot (the maximum house extent is 26 × 16 m);
+every lot has street frontage; no two houses overlap. The default
+is 2 × 2 blocks, ~16–24 houses. See ADR 0004.
 
 ```sh
 floorplan neighborhood --seed 42
@@ -76,16 +78,34 @@ floorplan neighborhood --seed 42
 floorplan neighborhood --seed 42 --blocks 3x3 --out nb.svg --json nb.json
 ```
 
+## WASM
+
+The core compiles to `wasm32-unknown-unknown` with zero crates and
+no wasm-bindgen — a thin adapter (`src/adapters/wasm.rs`) over the
+same generator. The web shell calls raw `extern "C"` exports and
+reads the results out of linear memory (protocol v1, see
+`docs/adr/0004-neighborhood-wasm.md`): `fp_version`,
+`fp_alloc`/`fp_free`, `fp_last_len`, `fp_house_json`,
+`fp_neighborhood_json`, `fp_house_mesh`, `fp_neighborhood_mesh`.
+JSON payloads are the same text the CLI writers emit; mesh payloads
+are a binary `FPM1` blob (positions, indices, material ids, material
+table). The built module lives at `wasm/floorplan.wasm` (release,
+218,419 bytes).
+
+```sh
+make wasm            # debug module + Node harness (364 checks vs native)
+# Release module:
+RUSTFLAGS="-C panic=abort" cargo build --release --lib --target wasm32-unknown-unknown
+# tools/wasm_check.mjs --wasm <path> --bin <native binary> verifies a build.
+```
+
 ## Room-size caps
 
 Bath is capped at 6 sq m and study at 12 sq m. Over-cap leaves are
-split (a 2.4 m strip, remainder Dining or Laundry) or reassigned;
-bedrooms never take a sub-cap leaf while a larger one can hold one.
-The honest limit: a strict ≤ 6 sq m bath cap is geometrically
-impossible for most generated houses without re-tiling the leaves
-— over 200 seeds, 30 of 310 over-cap baths and 32 of 37 over-cap
-studies are fixed, the rest have no ≤ 6 sq m leaf to move to and
-no strip-cut that fits. See ADR 0002.
+re-tiled (re-split and reassigned) — over 200 seeds, 0 baths and
+0 studies over cap (one style per seed). The strict reading (all six
+styles × 200 seeds) still has 5 studies at 12.0–13.9 sq m in thin
+rects. See ADR 0003.
 
 ## Variety
 
@@ -101,6 +121,7 @@ as a factor. Empirically, 1000 seeds give 1000 distinct plan hashes
 ```sh
 make build            # release binary at target/release/floorplan
 make check            # cargo test (single-threaded) + clippy -D warnings
+make wasm             # debug WASM module + Node harness (364 checks)
 
 # One house, style picked by the seed:
 floorplan generate --seed 42
