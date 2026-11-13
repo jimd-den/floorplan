@@ -41,7 +41,22 @@ pub fn generate_house(seed: u32, style: Style) -> House {
         stairs = Some((g_hall, u_hall));
         floors.push(upper);
     }
-    House { seed, style, footprint: fp, floors, stairs }
+    with_lights(House {
+        seed,
+        style,
+        footprint: fp,
+        floors,
+        stairs,
+        lights: Vec::new(),
+    })
+}
+
+/// Fills a freshly built house's light sources from its rooms,
+/// furniture, windows, and porch. Kept separate so the plan pipeline
+/// stays light-free until the house exists.
+fn with_lights(mut house: House) -> House {
+    house.lights = crate::use_cases::light::lights_for_house(&house);
+    house
 }
 
 #[cfg(test)]

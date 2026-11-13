@@ -1,6 +1,7 @@
 //! The plan model: House, Floor, Room, Opening, Style. Pure data, no I/O.
 
 use crate::domain::geometry::{Rect, Segment};
+use crate::domain::light::LightSource;
 use crate::domain::style::Style;
 
 /// What a room is for.
@@ -108,4 +109,7 @@ pub struct House {
     pub floors: Vec<Floor>,
     /// (ground hall, upper hall) room ids, for two-storey styles.
     pub stairs: Option<(u32, u32)>,
+    /// The house's light sources and their state (SRD-001 FR-22).
+    /// Derived after furnishing, so lamps and rooms exist.
+    pub lights: Vec<LightSource>,
 }

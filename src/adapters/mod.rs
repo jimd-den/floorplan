@@ -9,6 +9,7 @@ pub mod cli_parse_render;
 pub mod cli_render;
 pub mod gltf;
 pub mod json;
+pub mod light_json;
 pub mod mesh_payload;
 pub mod neighborhood_json;
 pub mod neighborhood_svg;

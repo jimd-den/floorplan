@@ -215,11 +215,36 @@ for (const seed of SEEDS) {
     `chunk (0,0) mesh is the fixed mesh seed ${seed}`,
     Buffer.compare(Buffer.from(originMesh), Buffer.from(fixedMesh)) === 0,
   );
+
+  // Lights and daylight (protocol v2).
+  const lights = JSON.parse(readJson(ex.fp_house_lights(seed, 3)));
+  check(`house lights have a flashlight seed ${seed}`, lights.some((l) => l.kind === 'flashlight'));
+  check(`house lights have a ceiling seed ${seed}`, lights.some((l) => l.kind === 'ceiling'));
+  const ceiling = lights.find((l) => l.kind === 'ceiling');
+  const toggled = JSON.parse(readJson(ex.fp_house_lights_toggled(seed, 3, ceiling.id)));
+  const after = toggled.find((l) => l.id === ceiling.id);
+  check(`toggled light changes state seed ${seed}`, after.state !== ceiling.state);
+  check(
+    `daylight noon is day seed ${seed}`,
+    JSON.parse(readJson(ex.fp_daylight(720, 1))).phase === 'day',
+  );
+  check(
+    `daylight midnight is night seed ${seed}`,
+    JSON.parse(readJson(ex.fp_daylight(0, 0))).phase === 'night',
+  );
+  check(
+    `light toggle codes seed ${seed}`,
+    ex.fp_light_toggle_state(0) === 1 && ex.fp_light_toggle_state(9) === -1,
+  );
 }
 
 // An invalid style index is refused, not a trap.
 check('invalid style returns null', ex.fp_house_json(42, 6) === 0 && ex.fp_last_len() === 0);
 check('invalid mesh style returns null', ex.fp_house_mesh(42, 99) === 0 && ex.fp_last_len() === 0);
+check(
+  'invalid light returns null',
+  ex.fp_house_lights_toggled(42, 3, 99999) === 0 && ex.fp_last_len() === 0,
+);
 
 rmSync(tmp, { recursive: true, force: true });
 console.log(`wasm_check: ${passes} passed, ${failures} failed`);

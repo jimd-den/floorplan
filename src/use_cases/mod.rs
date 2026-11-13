@@ -22,6 +22,8 @@ pub mod haunt_events;
 pub mod haunt_tasks;
 pub mod interact;
 pub mod layout;
+pub mod light;
+pub mod light_dread;
 pub mod lots;
 pub mod placement;
 pub mod repair;

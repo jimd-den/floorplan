@@ -112,7 +112,8 @@ reads the results out of linear memory (protocol v2, see
 `docs/adr/0004-neighborhood-wasm.md` and `docs/adr/0007-streaming-chunks.md`): `fp_version`,
 `fp_alloc`/`fp_free`, `fp_last_len`, `fp_house_json`,
 `fp_neighborhood_json`, `fp_house_mesh`, `fp_neighborhood_mesh`,
-`fp_chunk_json`, `fp_chunk_mesh`.
+`fp_chunk_json`, `fp_chunk_mesh`, `fp_house_lights`,
+`fp_house_lights_toggled`, `fp_daylight`, `fp_light_toggle_state`.
 JSON payloads are the same text the CLI writers emit; mesh payloads
 are a binary `FPM1` blob (positions, indices, material ids, material
 table). The built module is committed as base64 at
@@ -165,9 +166,32 @@ use cases over `DreadState` (SRD-001 §4.2, ADR 0005):
   `LampOn`, `LightFlicker`) and append-only in the event log.
 
 The shell supplies the systems (darkness, dark minutes, tasks done,
-light relief) as data — M3 light play will fill those values without
-changing the interface. `tests/haunt.rs` proves the dial-0 property
-over 10 seeds × 100 actions.
+light relief) as data — M3 light play fills those values without
+changing the interface (ADR 0008). `tests/haunt.rs` proves the
+dial-0 property over 10 seeds × 100 actions.
+
+## Light play (M3)
+
+Lights are domain objects (`domain/light.rs`): ceiling, lamp, porch,
+flashlight, and window, each with a position, radius, and state
+(on / off / flicker / broken). Every room gets a ceiling light and
+every lamp a light of its own; windows admit daylight by sun
+position. `House.lights` is derived after furnishing, so the mesh
+and the lighting cannot disagree.
+
+- **Switches** are commands through the one command model:
+  `ToggleLight { light_id }`. A broken light is refused, never
+  repaired. Every room is navigable: a working ceiling light or the
+  carried flashlight (AC-8).
+- **Daylight** is a 24-hour cycle (`Daylight::at`, `advance`,
+  `held_at`). Night is genuinely dark; the sandbox can hold it at
+  day.
+- **Dread coupling** lives in `use_cases/light_dread.rs`: darkness
+  and light relief are complements, and a flicker is offered as a
+  dread event, not a render bug (FR-25).
+
+The WASM boundary (protocol v2) exposes `fp_house_lights`,
+`fp_house_lights_toggled`, `fp_daylight`, and `fp_light_toggle_state`.
 
 ## Room-size caps
 

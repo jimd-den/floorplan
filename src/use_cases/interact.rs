@@ -17,6 +17,13 @@ pub fn apply(house: &mut House, command: Interaction) -> bool {
         Interaction::OpenDoor { door_id } => set_door(house, door_id, true),
         Interaction::CloseDoor { door_id } => set_door(house, door_id, false),
         Interaction::ToggleLamp { furniture_id } => toggle_lamp(house, furniture_id),
+        Interaction::ToggleLight { light_id } => {
+            if !crate::use_cases::light::toggle(&mut house.lights, light_id) {
+                return false;
+            }
+            crate::use_cases::light::sync_lamp(house, light_id);
+            true
+        }
         Interaction::MoveFurniture { furniture_id, to } => move_furniture(house, furniture_id, to),
     }
 }

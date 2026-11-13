@@ -14,6 +14,8 @@ pub enum Interaction {
     CloseDoor { door_id: u32 },
     /// Flip a lamp on or off.
     ToggleLamp { furniture_id: u32 },
+    /// Flip any light: a ceiling, lamp, porch, or the flashlight.
+    ToggleLight { light_id: u32 },
     /// Move a chair or table to a new rect (north-west corner).
     MoveFurniture { furniture_id: u32, to: Rect },
 }

@@ -5,8 +5,9 @@
 use floorplan::adapters::json::render_json;
 use floorplan::adapters::neighborhood_json::render_neighborhood_json;
 use floorplan::adapters::wasm::{
-    MESH_MAGIC, PROTOCOL_VERSION, chunk_json, chunk_mesh_bytes, house_json, house_mesh_bytes,
-    mesh_bytes, neighborhood_json, neighborhood_mesh_bytes,
+    MESH_MAGIC, PROTOCOL_VERSION, chunk_json, chunk_mesh_bytes, daylight_json, house_json,
+    house_lights_json, house_lights_toggled_json, house_mesh_bytes, light_toggle_state, mesh_bytes,
+    neighborhood_json, neighborhood_mesh_bytes,
 };
 use floorplan::domain::style::Style;
 use floorplan::use_cases::extrude::extrude;
@@ -144,4 +145,40 @@ fn a_chunk_mesh_parses_back_and_is_deterministic() {
     assert!(ms.iter().all(|&m| (m as usize) < table.len()));
     assert_eq!(bytes, chunk_mesh_bytes(42, 1, 0).unwrap());
     assert_ne!(bytes, chunk_mesh_bytes(42, 2, 0).unwrap());
+}
+
+#[test]
+fn house_lights_carry_the_flashlight_and_rooms() {
+    let text = String::from_utf8(house_lights_json(42, 3).unwrap()).unwrap();
+    assert!(text.contains("\"kind\":\"flashlight\""), "no flashlight");
+    assert!(text.contains("\"kind\":\"ceiling\""), "no ceiling light");
+    assert!(text.contains("\"kind\":\"window\""), "no window light");
+}
+
+#[test]
+fn a_toggled_light_crosses_the_boundary() {
+    let toggled = String::from_utf8(house_lights_toggled_json(42, 3, 1000).unwrap()).unwrap();
+    let entry = toggled
+        .split("{\"id\":1000,")
+        .nth(1)
+        .expect("room 0 has no ceiling light")
+        .split('}')
+        .next()
+        .unwrap();
+    assert!(entry.contains("\"state\":\"on\""), "the switch did not reach the light");
+    assert!(house_lights_toggled_json(42, 3, 99999).is_err());
+}
+
+#[test]
+fn daylight_json_has_day_and_night() {
+    assert!(String::from_utf8(daylight_json(720, true)).unwrap().contains("\"phase\":\"day\""));
+    assert!(String::from_utf8(daylight_json(0, false)).unwrap().contains("\"phase\":\"night\""));
+}
+
+#[test]
+fn a_switch_code_toggles() {
+    assert_eq!(light_toggle_state(0), Some(1));
+    assert_eq!(light_toggle_state(1), Some(0));
+    assert_eq!(light_toggle_state(3), Some(3));
+    assert_eq!(light_toggle_state(9), None);
 }
