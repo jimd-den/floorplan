@@ -1,0 +1,58 @@
+newmtl wall
+Kd 0.850 0.850 0.850
+newmtl ceiling
+Kd 0.950 0.950 0.950
+newmtl roof
+Kd 0.350 0.350 0.380
+newmtl stairs
+Kd 0.550 0.380 0.220
+newmtl porch
+Kd 0.700 0.700 0.680
+newmtl living
+Kd 0.900 0.800 0.650
+newmtl kitchen
+Kd 0.650 0.750 0.850
+newmtl dining
+Kd 0.700 0.850 0.650
+newmtl bedroom
+Kd 0.750 0.700 0.850
+newmtl bath
+Kd 0.600 0.850 0.850
+newmtl hall
+Kd 0.800 0.800 0.800
+newmtl entry
+Kd 0.850 0.550 0.400
+newmtl study
+Kd 0.900 0.850 0.600
+newmtl laundry
+Kd 0.850 0.700 0.750
+newmtl garage
+Kd 0.600 0.600 0.600
+newmtl bed
+Kd 0.450 0.350 0.650
+newmtl nightstand
+Kd 0.550 0.400 0.250
+newmtl table
+Kd 0.600 0.450 0.300
+newmtl chair
+Kd 0.500 0.400 0.300
+newmtl sofa
+Kd 0.700 0.300 0.300
+newmtl lamp
+Kd 0.900 0.850 0.600
+newmtl desk
+Kd 0.550 0.450 0.300
+newmtl tub
+Kd 0.950 0.950 0.950
+newmtl sink
+Kd 0.900 0.900 0.950
+newmtl shelf
+Kd 0.650 0.500 0.350
+newmtl cabinet
+Kd 0.600 0.550 0.450
+newmtl counter
+Kd 0.750 0.750 0.750
+newmtl lamp_on
+Kd 1.000 0.950 0.550
+newmtl door
+Kd 0.600 0.450 0.300

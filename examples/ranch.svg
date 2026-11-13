@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="664" height="588" viewBox="-1.00 -1.00 16.60 14.70">
+<style>text{font-family:sans-serif;font-size:0.35px;fill:#222} .dim{font-size:0.28px;fill:#555} .wall{stroke:#111;stroke-width:0.15} .win{stroke:#258;stroke-width:0.06} .gap{stroke:#fff;stroke-width:0.16} .swing{fill:none;stroke:#888;stroke-width:0.03} .porch{fill:none;stroke:#888;stroke-width:0.05;stroke-dasharray:0.3 0.2}</style>
+<text x="0.00" y="-0.35">Ground floor</text>
+<rect class="porch" x="3.10" y="10.30" width="8.30" height="2.40"/>
+<line class="wall" x1="0.00" y1="4.00" x2="5.60" y2="4.00"/>
+<line class="wall" x1="5.60" y1="4.00" x2="5.60" y2="6.70"/>
+<line class="wall" x1="0.00" y1="6.70" x2="5.60" y2="6.70"/>
+<line class="wall" x1="0.00" y1="4.00" x2="0.00" y2="6.70"/>
+<line class="wall" x1="9.40" y1="0.00" x2="12.20" y2="0.00"/>
+<line class="wall" x1="12.20" y1="0.00" x2="12.20" y2="6.70"/>
+<line class="wall" x1="9.40" y1="6.70" x2="12.20" y2="6.70"/>
+<line class="wall" x1="9.40" y1="0.00" x2="9.40" y2="6.70"/>
+<line class="wall" x1="12.20" y1="0.00" x2="14.60" y2="0.00"/>
+<line class="wall" x1="14.60" y1="0.00" x2="14.60" y2="6.70"/>
+<line class="wall" x1="12.20" y1="6.70" x2="14.60" y2="6.70"/>
+<line class="wall" x1="5.60" y1="0.00" x2="9.40" y2="0.00"/>
+<line class="wall" x1="9.40" y1="0.00" x2="9.40" y2="2.50"/>
+<line class="wall" x1="5.60" y1="2.50" x2="9.40" y2="2.50"/>
+<line class="wall" x1="5.60" y1="0.00" x2="5.60" y2="2.50"/>
+<line class="wall" x1="9.40" y1="2.50" x2="9.40" y2="6.70"/>
+<line class="wall" x1="5.60" y1="6.70" x2="9.40" y2="6.70"/>
+<line class="wall" x1="5.60" y1="2.50" x2="5.60" y2="6.70"/>
+<line class="wall" x1="0.00" y1="0.00" x2="3.00" y2="0.00"/>
+<line class="wall" x1="3.00" y1="0.00" x2="3.00" y2="4.00"/>
+<line class="wall" x1="0.00" y1="4.00" x2="3.00" y2="4.00"/>
+<line class="wall" x1="0.00" y1="0.00" x2="0.00" y2="4.00"/>
+<line class="wall" x1="3.00" y1="0.00" x2="5.60" y2="0.00"/>
+<line class="wall" x1="5.60" y1="0.00" x2="5.60" y2="4.00"/>
+<line class="wall" x1="3.00" y1="4.00" x2="5.60" y2="4.00"/>
+<line class="wall" x1="0.00" y1="6.70" x2="3.20" y2="6.70"/>
+<line class="wall" x1="3.20" y1="6.70" x2="3.20" y2="10.30"/>
+<line class="wall" x1="0.00" y1="10.30" x2="3.20" y2="10.30"/>
+<line class="wall" x1="0.00" y1="6.70" x2="0.00" y2="10.30"/>
+<line class="gap" x1="9.40" y1="4.65" x2="9.40" y2="5.55"/>
+<path class="swing" d="M 9.40 5.55 A 0.90 0.90 0 0 0 10.30 4.65"/>
+<line class="swing" x1="9.40" y1="4.65" x2="10.30" y2="4.65"/>
+<line class="gap" x1="5.60" y1="5.40" x2="5.60" y2="6.30"/>
+<path class="swing" d="M 5.60 6.30 A 0.90 0.90 0 0 1 4.70 5.40"/>
+<line class="swing" x1="5.60" y1="5.40" x2="4.70" y2="5.40"/>
+<line class="gap" x1="0.45" y1="4.00" x2="1.35" y2="4.00"/>
+<path class="swing" d="M 1.35 4.00 A 0.90 0.90 0 0 1 0.45 4.90"/>
+<line class="swing" x1="0.45" y1="4.00" x2="0.45" y2="4.90"/>
+<line class="gap" x1="12.20" y1="3.40" x2="12.20" y2="4.30"/>
+<path class="swing" d="M 12.20 4.30 A 0.90 0.90 0 0 1 11.30 3.40"/>
+<line class="swing" x1="12.20" y1="3.40" x2="11.30" y2="3.40"/>
+<line class="gap" x1="7.35" y1="2.50" x2="8.25" y2="2.50"/>
+<path class="swing" d="M 8.25 2.50 A 0.90 0.90 0 0 0 7.35 1.60"/>
+<line class="swing" x1="7.35" y1="2.50" x2="7.35" y2="1.60"/>
+<line class="gap" x1="3.00" y1="0.45" x2="3.00" y2="1.35"/>
+<path class="swing" d="M 3.00 1.35 A 0.90 0.90 0 0 1 2.10 0.45"/>
+<line class="swing" x1="3.00" y1="0.45" x2="2.10" y2="0.45"/>
+<line class="gap" x1="0.75" y1="6.70" x2="1.65" y2="6.70"/>
+<path class="swing" d="M 1.65 6.70 A 0.90 0.90 0 0 0 0.75 5.80"/>
+<line class="swing" x1="0.75" y1="6.70" x2="0.75" y2="5.80"/>
+<line class="gap" x1="1.50" y1="10.30" x2="2.50" y2="10.30"/>
+<path class="swing" d="M 2.50 10.30 A 1.00 1.00 0 0 0 1.50 9.30"/>
+<line class="swing" x1="1.50" y1="10.30" x2="1.50" y2="9.30"/>
+<line class="gap" x1="0.00" y1="4.70" x2="0.00" y2="6.40"/>
+<line class="win" x1="-0.06" y1="4.70" x2="-0.06" y2="6.40"/>
+<line class="win" x1="0.06" y1="4.70" x2="0.06" y2="6.40"/>
+<line class="gap" x1="10.20" y1="0.00" x2="11.80" y2="0.00"/>
+<line class="win" x1="10.20" y1="-0.06" x2="11.80" y2="-0.06"/>
+<line class="win" x1="10.20" y1="0.06" x2="11.80" y2="0.06"/>
+<line class="gap" x1="14.60" y1="3.10" x2="14.60" y2="4.80"/>
+<line class="win" x1="14.54" y1="3.10" x2="14.54" y2="4.80"/>
+<line class="win" x1="14.66" y1="3.10" x2="14.66" y2="4.80"/>
+<line class="gap" x1="6.00" y1="6.70" x2="7.40" y2="6.70"/>
+<line class="win" x1="6.00" y1="6.64" x2="7.40" y2="6.64"/>
+<line class="win" x1="6.00" y1="6.76" x2="7.40" y2="6.76"/>
+<line class="gap" x1="0.00" y1="1.80" x2="0.00" y2="3.20"/>
+<line class="win" x1="-0.06" y1="1.80" x2="-0.06" y2="3.20"/>
+<line class="win" x1="0.06" y1="1.80" x2="0.06" y2="3.20"/>
+<line class="gap" x1="3.20" y1="8.35" x2="3.20" y2="9.65"/>
+<line class="win" x1="3.14" y1="8.35" x2="3.14" y2="9.65"/>
+<line class="win" x1="3.26" y1="8.35" x2="3.26" y2="9.65"/>
+<text x="2.80" y="5.25" text-anchor="middle">bedroom</text>
+<text class="dim" x="2.80" y="5.65" text-anchor="middle">5.6×2.7 m</text>
+<text x="10.80" y="3.25" text-anchor="middle">living</text>
+<text class="dim" x="10.80" y="3.65" text-anchor="middle">2.8×6.7 m</text>
+<text x="13.40" y="3.25" text-anchor="middle">kitchen</text>
+<text class="dim" x="13.40" y="3.65" text-anchor="middle">2.4×6.7 m</text>
+<text x="7.50" y="1.15" text-anchor="middle">bath</text>
+<text class="dim" x="7.50" y="1.55" text-anchor="middle">3.8×2.5 m</text>
+<text x="7.50" y="4.50" text-anchor="middle">dining</text>
+<text class="dim" x="7.50" y="4.90" text-anchor="middle">3.8×4.2 m</text>
+<text x="1.50" y="1.90" text-anchor="middle">bedroom</text>
+<text class="dim" x="1.50" y="2.30" text-anchor="middle">3×4 m</text>
+<text x="4.30" y="1.90" text-anchor="middle">bath</text>
+<text class="dim" x="4.30" y="2.30" text-anchor="middle">2.6×4 m</text>
+<text x="1.60" y="8.40" text-anchor="middle">entry</text>
+<text class="dim" x="1.60" y="8.80" text-anchor="middle">3.2×3.6 m</text>
+<polygon points="14.30,-0.60 14.15,-0.10 14.45,-0.10" fill="#111"/>
+<text x="14.30" y="0.30" text-anchor="middle">N</text>
+<text x="0.00" y="13.40">Scale: 1 unit = 1 m — Ranch — seed 42</text>
+</svg>

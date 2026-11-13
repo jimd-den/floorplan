@@ -1,0 +1,20 @@
+[package]
+name = "floorplan"
+version = "0.1.0"
+edition = "2024"
+description = "Clean-architecture floor plan generator: millions of unique houses from a u32 seed"
+license = "MIT"
+
+[[bin]]
+name = "floorplan"
+path = "src/main.rs"
+
+[lib]
+name = "floorplan"
+path = "src/lib.rs"
+# cdylib so the WASM adapter's exports land in a .wasm file;
+# rlib so native tests keep linking the library.
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+debug = false
