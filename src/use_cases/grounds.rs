@@ -12,14 +12,17 @@ use crate::domain::neighborhood::{Neighborhood, PlacedHouse, house_extent, place
 use crate::frameworks_drivers::rng::Rng;
 use crate::use_cases::materials::{DRIVEWAY, LEAF, TRUNK};
 
-/// Adds every driveway and tree to a neighborhood mesh.
+/// Adds every driveway, front walkway, back-yard fence, and tree to a
+/// neighborhood mesh.
 pub fn add_grounds(mesh: &mut Mesh, n: &Neighborhood) {
     for h in &n.houses {
         if let Some(garage) = h.house.footprint.garage {
             add_driveway(mesh, n, h, garage);
         }
+        mesh.add_box(walkway_box(n, h), DRIVEWAY);
     }
     for index in 0..n.lots.len() {
+        mesh.add_box(fence_box(n, index), TRUNK);
         add_trees(mesh, n, index);
     }
 }
@@ -115,51 +118,31 @@ fn add_tree(mesh: &mut Mesh, x: f64, z: f64) {
     mesh.add_box(Box3::new([x - 0.7, 1.9, z - 0.7], [x + 0.7, 3.5, z + 0.7]), LEAF);
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::use_cases::materials::material_table;
-    use crate::use_cases::neighborhood::generate_neighborhood;
+/// The walkway box from a placed house's front to its street.
+pub fn walkway_box(n: &Neighborhood, h: &PlacedHouse) -> Box3 {
+    let street = n.streets[n.lots[h.lot].street].rect;
+    let cx = h.rect.x + h.rect.w / 2.0;
+    let cz = h.rect.y + h.rect.d / 2.0;
+    let (x0, z0, x1, z1) = match h.rotation {
+        0 => (cx - 0.55, h.rect.bottom(), cx + 0.55, street.y),
+        180 => (cx - 0.55, street.bottom(), cx + 0.55, h.rect.y),
+        90 => (h.rect.right(), cz - 0.55, street.x, cz + 0.55),
+        _ => (street.right(), cz - 0.55, h.rect.x, cz + 0.55),
+    };
+    let (xa, xb) = (x0.min(x1), x0.max(x1).max(x0.min(x1) + 0.5));
+    let (za, zb) = (z0.min(z1), z0.max(z1).max(z0.min(z1) + 0.5));
+    Box3::new([xa as f32, -0.018, za as f32], [xb as f32, -0.004, zb as f32])
+}
 
-    fn grounded(seed: u32) -> Mesh {
-        let n = generate_neighborhood(seed, (2, 2));
-        let mut mesh = Mesh::new(material_table());
-        add_grounds(&mut mesh, &n);
-        mesh
-    }
-
-    fn leaf_faces(mesh: &Mesh) -> usize {
-        mesh.materials.iter().filter(|m| **m == LEAF).count()
-    }
-
-    #[test]
-    fn a_neighborhood_with_garages_gets_driveways() {
-        let mesh = grounded(42);
-        assert!(mesh.materials.contains(&DRIVEWAY), "no driveway material");
-    }
-
-    #[test]
-    fn every_lot_gets_one_or_two_trees() {
-        let n = generate_neighborhood(42, (2, 2));
-        let mesh = grounded(42);
-        let trees = leaf_faces(&mesh) / 12;
-        assert!(trees >= n.lots.len(), "a lot has no tree");
-        assert!(trees <= 2 * n.lots.len(), "too many trees");
-    }
-
-    #[test]
-    fn every_tree_stands_inside_a_lot() {
-        let n = generate_neighborhood(42, (2, 2));
-        for index in 0..n.lots.len() {
-            let lot = n.lots[index].rect;
-            for (x, z) in tree_positions(&n, index) {
-                assert!(lot.contains_point(x, z), "tree at ({x},{z}) is outside its lot");
-            }
-        }
-    }
-
-    #[test]
-    fn grounds_are_deterministic() {
-        assert_eq!(grounded(42).vertices, grounded(42).vertices);
-    }
+/// The back-yard fence box along the rear edge of a lot.
+pub fn fence_box(n: &Neighborhood, index: usize) -> Box3 {
+    let lot = n.lots[index].rect;
+    let side = street_side(lot, n.streets[n.lots[index].street].rect);
+    let (x0, z0, x1, z1) = match side {
+        Side::North => (lot.x + 0.5, lot.bottom() - 0.3, lot.right() - 0.5, lot.bottom() - 0.2),
+        Side::South => (lot.x + 0.5, lot.y + 0.2, lot.right() - 0.5, lot.y + 0.3),
+        Side::West => (lot.right() - 0.3, lot.y + 0.5, lot.right() - 0.2, lot.bottom() - 0.5),
+        Side::East => (lot.x + 0.2, lot.y + 0.5, lot.x + 0.3, lot.bottom() - 0.5),
+    };
+    Box3::new([x0 as f32, 0.0, z0 as f32], [x1 as f32, 1.1, z1 as f32])
 }

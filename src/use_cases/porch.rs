@@ -6,8 +6,8 @@
 //! makes a front door read as a front door.
 
 use crate::domain::mesh::{Box3, Mesh};
-use crate::domain::model::House;
-use crate::use_cases::materials::{PORCH, ROOF, TRIM};
+use crate::domain::model::{House, Program};
+use crate::use_cases::materials::{DOOR_FRAME, PORCH, ROOF, TRIM};
 
 /// Post thickness, in metres.
 const POST: f32 = 0.12;
@@ -28,6 +28,26 @@ pub fn add_porch(mesh: &mut Mesh, house: &House) {
     mesh.add_box(
         Box3::new([x0 - 0.2, ROOF_Y, z0 - 0.2], [x1 + 0.2, ROOF_Y + ROOF_T, z1 + 0.2]),
         ROOF,
+    );
+}
+
+/// Adds an overhead garage door on the garage room's front wall.
+pub fn add_garage_door(mesh: &mut Mesh, house: &House) {
+    let Some(floor) = house.floors.first() else { return };
+    let Some(garage) = floor.rooms.iter().find(|r| r.program == Program::Garage) else {
+        return;
+    };
+    let g = garage.rect;
+    let cx = (g.x + g.w / 2.0) as f32;
+    let half_w = ((g.w as f32 - 1.2) / 2.0).max(1.2);
+    let z = g.bottom() as f32;
+    mesh.add_box(
+        Box3::new([cx - half_w - 0.08, 0.0, z + 0.07], [cx + half_w + 0.08, 2.22, z + 0.10]),
+        TRIM,
+    );
+    mesh.add_box(
+        Box3::new([cx - half_w, 0.02, z + 0.08], [cx + half_w, 2.14, z + 0.12]),
+        DOOR_FRAME,
     );
 }
 

@@ -13,7 +13,7 @@ use crate::use_cases::door_panel::door_panels;
 use crate::use_cases::furniture_mesh::furniture_boxes;
 use crate::use_cases::lining::add_wall_linings;
 use crate::use_cases::materials::{CEILING, SIDING, WALL, program_material};
-use crate::use_cases::porch::add_porch;
+use crate::use_cases::porch::{add_garage_door, add_porch};
 use crate::use_cases::roof::add_roof;
 use crate::use_cases::stairs::stairs_boxes;
 use crate::use_cases::trim::add_trim;
@@ -49,6 +49,7 @@ pub fn extrude(house: &House) -> Mesh {
         mesh.add_box(b, m);
     }
     add_porch(&mut mesh, house);
+    add_garage_door(&mut mesh, house);
     add_roof(&mut mesh, house);
     mesh
 }
