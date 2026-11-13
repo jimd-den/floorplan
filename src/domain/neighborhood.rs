@@ -95,11 +95,27 @@ pub fn place_rect(local: Rect, extent: Rect, placed: Rect, rotation: u16) -> Rec
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::geometry::Segment;
+    use crate::domain::model::Footprint;
     use crate::domain::style::Style;
-    use crate::use_cases::generate::generate_house;
 
     fn a_house() -> House {
-        generate_house(42, Style::Colonial)
+        House {
+            seed: 42,
+            style: Style::Colonial,
+            footprint: Footprint {
+                rects: vec![
+                    Rect::new(0.0, 0.0, 12.0, 8.0),
+                    Rect::new(0.0, 8.0, 6.0, 3.0),
+                ],
+                joins: vec![Segment::new(0.0, 8.0, 6.0, 8.0)],
+                porch: Some(Rect::new(6.0, 8.0, 4.0, 3.0)),
+                garage: Some(Rect::new(12.0, 2.0, 6.0, 6.0)),
+            },
+            floors: Vec::new(),
+            stairs: None,
+            lights: Vec::new(),
+        }
     }
 
     #[test]
@@ -116,18 +132,6 @@ mod tests {
             assert!(p.right() <= e.right() + 1e-9 && p.bottom() <= e.bottom() + 1e-9);
         }
         assert!(e.w > 0.0 && e.d > 0.0, "empty extent");
-    }
-
-    #[test]
-    fn the_extent_is_never_wider_than_26_or_deeper_than_16() {
-        // The neighborhood lot sizes rest on this bound.
-        for seed in 0..200u32 {
-            for style in Style::all() {
-                let e = house_extent(&generate_house(seed, style));
-                assert!(e.w <= 26.0 + 1e-9, "seed {seed} {style:?}: width {}", e.w);
-                assert!(e.d <= 16.0 + 1e-9, "seed {seed} {style:?}: depth {}", e.d);
-            }
-        }
     }
 
     #[test]

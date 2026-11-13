@@ -3,9 +3,23 @@
 
 use floorplan::adapters::neighborhood_json::render_neighborhood_json;
 use floorplan::adapters::neighborhood_svg::render_neighborhood_svg;
+use floorplan::domain::neighborhood::house_extent;
+use floorplan::domain::style::Style;
+use floorplan::use_cases::generate::generate_house;
 use floorplan::use_cases::neighborhood::{BACK_SETBACK, FRONT_SETBACK, SIDE_SETBACK, generate_neighborhood};
 use floorplan::use_cases::variety::neighborhood_hash;
 use std::collections::HashSet;
+
+#[test]
+fn the_extent_is_never_wider_than_26_or_deeper_than_16() {
+    for seed in 0..200u32 {
+        for style in Style::all() {
+            let e = house_extent(&generate_house(seed, style));
+            assert!(e.w <= 26.0 + 1e-9, "seed {seed} {style:?}: width {}", e.w);
+            assert!(e.d <= 16.0 + 1e-9, "seed {seed} {style:?}: depth {}", e.d);
+        }
+    }
+}
 
 fn inside(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)) -> bool {
     a.0 >= b.0 - 1e-9 && a.1 >= b.1 - 1e-9 && a.2 <= b.2 + 1e-9 && a.3 <= b.3 + 1e-9

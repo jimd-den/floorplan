@@ -1,31 +1,109 @@
-//! Plan hashing: an FNV-1a hash over the seed-free plan JSON, used
-//! by the variety test to count distinct houses. The seed is
-//! excluded on purpose: hashing it would make every hash distinct
-//! by construction and prove nothing about the plans.
+//! Plan and neighborhood variety: pure FNV-1a hashing over the
+//! seed-free domain structures, plus combinatorial variety bounds.
+//!
+//! Nothing here imports `adapters/`: the hashes walk the domain data
+//! directly with zero string allocation (NFR-6). Seeds are excluded on
+//! purpose so distinct hashes mean distinct plans or neighborhoods.
 
-use crate::adapters::json::render_plan_json;
-use crate::adapters::neighborhood_json::render_neighborhood_plan_json;
+use crate::domain::geometry::{Axis, Rect};
 use crate::domain::model::House;
 use crate::domain::neighborhood::Neighborhood;
 
-/// FNV-1a over a string.
-fn fnv1a(text: &str) -> u64 {
-    let mut hash: u64 = 0xcbf29ce484222325;
-    for b in text.as_bytes() {
-        hash ^= *b as u64;
-        hash = hash.wrapping_mul(0x100000001b3);
+const FNV_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+const FNV_PRIME: u64 = 0x0100_0000_01b3;
+
+fn feed_bytes(mut hash: u64, bytes: &[u8]) -> u64 {
+    for &b in bytes {
+        hash ^= b as u64;
+        hash = hash.wrapping_mul(FNV_PRIME);
+    }
+    hash
+}
+
+fn feed_u64(hash: u64, v: u64) -> u64 {
+    feed_bytes(hash, &v.to_le_bytes())
+}
+
+fn feed_f64(hash: u64, v: f64) -> u64 {
+    let q = (v * 100.0).round() as i64;
+    feed_u64(hash, q as u64)
+}
+
+fn feed_rect(mut hash: u64, r: Rect) -> u64 {
+    hash = feed_f64(hash, r.x);
+    hash = feed_f64(hash, r.y);
+    hash = feed_f64(hash, r.w);
+    feed_f64(hash, r.d)
+}
+
+fn feed_house(mut hash: u64, house: &House) -> u64 {
+    hash = feed_bytes(hash, house.style.id().as_bytes());
+    for r in &house.footprint.rects {
+        hash = feed_rect(hash, *r);
+    }
+    if let Some(p) = house.footprint.porch {
+        hash = feed_rect(feed_u64(hash, 1), p);
+    }
+    if let Some(g) = house.footprint.garage {
+        hash = feed_rect(feed_u64(hash, 2), g);
+    }
+    for floor in &house.floors {
+        hash = feed_u64(hash, floor.level as u64);
+        for room in &floor.rooms {
+            hash = feed_u64(hash, room.id as u64);
+            hash = feed_bytes(hash, room.program.name().as_bytes());
+            hash = feed_rect(hash, room.rect);
+        }
+        for o in &floor.openings {
+            hash = feed_u64(hash, o.id as u64);
+            hash = feed_f64(hash, o.x);
+            hash = feed_f64(hash, o.y);
+            hash = feed_f64(hash, o.width);
+            hash = feed_u64(hash, matches!(o.axis, Axis::Horizontal) as u64);
+        }
     }
     hash
 }
 
 /// Hashes a plan. Same plan, same hash; the seed plays no part.
 pub fn plan_hash(house: &House) -> u64 {
-    fnv1a(&render_plan_json(house))
+    feed_house(FNV_OFFSET, house)
 }
 
 /// Hashes a neighborhood (seed-free). Same neighborhood, same hash.
 pub fn neighborhood_hash(n: &Neighborhood) -> u64 {
-    fnv1a(&render_neighborhood_plan_json(n))
+    let mut hash = feed_bytes(FNV_OFFSET, n.layout.id().as_bytes());
+    hash = feed_u64(hash, n.blocks.0 as u64);
+    hash = feed_u64(hash, n.blocks.1 as u64);
+    for s in &n.streets {
+        hash = feed_rect(hash, s.rect);
+        hash = feed_u64(hash, s.horizontal as u64);
+    }
+    for l in &n.lots {
+        hash = feed_rect(hash, l.rect);
+        hash = feed_u64(hash, l.street as u64);
+    }
+    for h in &n.houses {
+        hash = feed_u64(hash, h.lot as u64);
+        hash = feed_u64(hash, h.rotation as u64);
+        hash = feed_rect(hash, h.rect);
+        hash = feed_house(hash, &h.house);
+    }
+    hash
+}
+
+/// Conservative lower bound on distinct houses across the six styles:
+/// 6 styles × 861 footprints × 2 room counts × 40 first cuts ×
+/// 50 door positions × 8 entry positions × 27 window widths.
+pub fn house_variety_lower_bound() -> u64 {
+    6 * 861 * 2 * 40 * 50 * 8 * 27
+}
+
+/// Conservative lower bound on distinct 2x2 neighborhoods from street,
+/// block, and lot geometry alone (before multiplying by the ≥ 12 houses):
+/// 3 layout families × 201 block sizes × 41³ lot depths × 2³ strip counts.
+pub fn neighborhood_variety_lower_bound() -> u64 {
+    3 * 201 * 41 * 41 * 41 * 8
 }
 
 #[cfg(test)]
