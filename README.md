@@ -89,13 +89,17 @@ reads the results out of linear memory (protocol v1, see
 `fp_neighborhood_json`, `fp_house_mesh`, `fp_neighborhood_mesh`.
 JSON payloads are the same text the CLI writers emit; mesh payloads
 are a binary `FPM1` blob (positions, indices, material ids, material
-table). The built module lives at `wasm/floorplan.wasm` (release,
-218,419 bytes).
+table). The built module is committed as base64 at
+`wasm/floorplan.wasm.b64` (release, 218,419 bytes) — the binary
+itself can't travel through this repo's text-only push path — and
+decodes back with one command:
 
 ```sh
 make wasm            # debug module + Node harness (364 checks vs native)
 # Release module:
 RUSTFLAGS="-C panic=abort" cargo build --release --lib --target wasm32-unknown-unknown
+# Decode the committed copy back to the binary:
+base64 -d wasm/floorplan.wasm.b64 > floorplan.wasm
 # tools/wasm_check.mjs --wasm <path> --bin <native binary> verifies a build.
 ```
 
