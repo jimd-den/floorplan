@@ -16,6 +16,7 @@ pub mod neighborhood_svg;
 pub mod obj;
 pub mod png;
 pub mod render;
+pub mod shade;
 pub mod svg;
 pub mod svg_openings;
 pub mod wasm;

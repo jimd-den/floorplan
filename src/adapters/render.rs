@@ -7,6 +7,7 @@
 //! (ADR 0006). Camera math and near-plane clipping are `adapters::camera`.
 
 use crate::adapters::camera::clip_near;
+use crate::adapters::shade::{apply_haze, face_shade};
 use crate::domain::mesh::Mesh;
 
 pub use crate::adapters::camera::{Camera, Viewport};
@@ -55,7 +56,7 @@ pub fn render(mesh: &Mesh, camera: &Camera, viewport: Viewport) -> Image {
             mesh.vertices[face[2] as usize],
         ];
         let Some(normal) = normal(v[0], v[1], v[2]) else { continue };
-        let shade = 0.55 + 0.45 * dot(normal, forward).abs();
+        let shade = face_shade(normal, forward);
         let rgb = [
             (color[0] * shade * 255.0).clamp(0.0, 255.0) as u8,
             (color[1] * shade * 255.0).clamp(0.0, 255.0) as u8,
@@ -107,7 +108,7 @@ fn raster(image: &mut Image, depth: &mut [f32], tri: &Triangle) {
             let idx = y * image.width + x;
             if z < depth[idx] {
                 depth[idx] = z;
-                image.pixels[idx] = tri.rgb;
+                image.pixels[idx] = apply_haze(tri.rgb, z);
             }
         }
     }
