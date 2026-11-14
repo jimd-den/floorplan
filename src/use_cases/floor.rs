@@ -114,9 +114,7 @@ pub fn build_floor(
     let mut openings = place_doors(rng, &rooms, &splits, &joins, entry);
     let mut next_id = openings.len() as u32;
     openings.extend(place_windows(rng, &rooms, style, &mut next_id));
-    let mut floor = Floor { level, rooms, openings, furniture: vec![], open_doors: vec![] };
-    floor.furniture = crate::use_cases::furnish::furnish(rng, &floor);
-    floor
+    Floor { level, rooms, openings, furniture: vec![], open_doors: vec![] }
 }
 
 /// The upper floor covers the main rect (Colonial) or the whole footprint.

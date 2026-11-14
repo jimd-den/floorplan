@@ -2,6 +2,7 @@
 
 use floorplan::domain::geometry::Rect;
 use floorplan::domain::neighborhood::house_extent;
+use floorplan::domain::model::Program;
 use floorplan::domain::style::Style;
 use floorplan::use_cases::generate::generate_house;
 use floorplan::use_cases::neighborhood::generate_neighborhood;
@@ -49,6 +50,29 @@ fn the_interior_eye_does_not_stand_inside_furniture() {
                 && eye[2] >= r.y as f32 - 0.2
                 && eye[2] <= r.bottom() as f32 + 0.2;
             assert!(!inside, "seed {seed}: eye stands in {:?}", piece.kind);
+        }
+    }
+}
+
+#[test]
+fn the_interior_stands_in_a_furnished_room_not_the_garage() {
+    for seed in 0..20u32 {
+        for style in Style::all() {
+            let house = generate_house(seed, style);
+            if house.floors[0].rooms.iter().all(|r| r.program != Program::Garage) {
+                continue;
+            }
+            let Pose { eye, .. } = house_pose(&house, View::Interior);
+            let room = house.floors[0]
+                .rooms
+                .iter()
+                .find(|r| r.rect.contains_point(eye[0] as f64, eye[2] as f64))
+                .expect("interior eye is not inside a room");
+            assert_ne!(
+                room.program,
+                Program::Garage,
+                "seed {seed} {style:?}: interior eye is in the garage"
+            );
         }
     }
 }

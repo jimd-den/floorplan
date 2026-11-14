@@ -41,6 +41,13 @@ pub fn generate_house(seed: u32, style: Style) -> House {
         stairs = Some((g_hall, u_hall));
         floors.push(upper);
     }
+    // Furniture is placed after the plan is final, from its own RNG
+    // seeded by the house seed and floor, so the plan's re-tiling is
+    // independent of how many pieces a room can hold.
+    for (i, floor) in floors.iter_mut().enumerate() {
+        let mut furn_rng = Rng::new(seed ^ (i as u32 + 1).wrapping_mul(0x9E37_79B9));
+        floor.furniture = crate::use_cases::furnish::furnish(&mut furn_rng, floor);
+    }
     with_lights(House {
         seed,
         style,

@@ -5,7 +5,7 @@
 //! stand in, where the street runs), so it lives here rather than in
 //! the renderer.
 
-use crate::domain::model::House;
+use crate::domain::model::{House, Program};
 use crate::domain::neighborhood::{Neighborhood, house_extent};
 
 /// The three views the screenshot adapter can frame.
@@ -67,8 +67,15 @@ fn interior_pose(house: &House) -> Pose {
     let Some(floor) = house.floors.first() else {
         return Pose { eye: [0.0, 1.7, 0.0], target: [0.0, 1.2, -1.0] };
     };
-    let Some(room) = floor.rooms.iter().max_by(|a, b| {
-        let area = |r: &crate::domain::model::Room| r.rect.w * r.rect.d;
+    let area = |r: &crate::domain::model::Room| r.rect.w * r.rect.d;
+    let mut rooms: Vec<&crate::domain::model::Room> =
+        floor.rooms.iter().filter(|r| r.program != Program::Garage).collect();
+    if rooms.is_empty() {
+        rooms = floor.rooms.iter().collect();
+    }
+    // A garage is the largest room by area but is not a place to stand;
+    // choose the largest furnished living space instead.
+    let Some(room) = rooms.into_iter().max_by(|a, b| {
         area(a).partial_cmp(&area(b)).unwrap_or(std::cmp::Ordering::Equal)
     }) else {
         return Pose { eye: [0.0, 1.7, 0.0], target: [0.0, 1.2, -1.0] };
@@ -82,19 +89,47 @@ fn interior_pose(house: &House) -> Pose {
         (rect.x + inset, rect.bottom() - inset),
         (rect.right() - inset, rect.bottom() - inset),
     ];
+    // Look at the furniture, so the frame shows the room's contents;
+    // fall back to the far corner when the room is empty.
+    let Some(target) = furniture_centre(floor, room.id) else {
+        let target = corners
+            .iter()
+            .max_by(|a, b| dist2(**a, centre).partial_cmp(&dist2(**b, centre)).unwrap())
+            .copied()
+            .unwrap_or(centre);
+        let eye = std::iter::once(centre)
+            .chain(corners)
+            .find(|&(x, z)| !blocked(floor, room.id, x, z))
+            .unwrap_or(centre);
+        return Pose {
+            eye: [eye.0 as f32, 1.7, eye.1 as f32],
+            target: [target.0 as f32, 1.2, target.1 as f32],
+        };
+    };
+    // Stand as far from the furniture as the room allows, so the
+    // pieces are framed rather than filling the lens.
     let eye = std::iter::once(centre)
         .chain(corners)
-        .find(|&(x, z)| !blocked(floor, room.id, x, z))
-        .unwrap_or(centre);
-    let target = corners
-        .iter()
-        .max_by(|a, b| dist2(**a, eye).partial_cmp(&dist2(**b, eye)).unwrap())
-        .copied()
+        .filter(|&(x, z)| !blocked(floor, room.id, x, z))
+        .max_by(|a, b| dist2(*a, target).partial_cmp(&dist2(*b, target)).unwrap())
         .unwrap_or(centre);
     Pose {
         eye: [eye.0 as f32, 1.7, eye.1 as f32],
         target: [target.0 as f32, 1.2, target.1 as f32],
     }
+}
+
+/// The average centre of the room's furniture, in plan coordinates.
+fn furniture_centre(floor: &crate::domain::model::Floor, room_id: u32) -> Option<(f64, f64)> {
+    let pieces: Vec<_> = floor.furniture.iter().filter(|p| p.room_id == room_id).collect();
+    if pieces.is_empty() {
+        return None;
+    }
+    let (sx, sz) = pieces.iter().fold((0.0, 0.0), |(sx, sz), p| {
+        (sx + p.rect.x + p.rect.w / 2.0, sz + p.rect.y + p.rect.d / 2.0)
+    });
+    let n = pieces.len() as f64;
+    Some((sx / n, sz / n))
 }
 
 /// True when a piece of furniture in this room covers the plan point,

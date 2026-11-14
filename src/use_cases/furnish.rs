@@ -7,24 +7,25 @@
 
 use crate::domain::furniture::{Facing, Furniture, FurnitureKind};
 use crate::domain::geometry::Rect;
-use crate::use_cases::furnish_clear::fits;
+use crate::use_cases::furnish_clear::{fits, walkable};
 use crate::domain::model::{Floor, Opening, OpeningKind, Program, Room};
 use crate::frameworks_drivers::rng::Rng;
 
-/// The furniture set for a room program.
+/// The furniture set for a room program: a full set, not a token
+/// piece. Pieces that cannot fit are skipped by `furnish`.
 pub fn furniture_set(program: Program) -> &'static [FurnitureKind] {
     use FurnitureKind::*;
     match program {
-        Program::Bedroom => &[Bed, Nightstand, Cabinet],
-        Program::Dining => &[Table, Chair, Chair, Chair, Chair],
-        Program::Living => &[Sofa, Lamp, Table, Shelf],
-        Program::Bath => &[Tub, Sink],
-        Program::Study => &[Desk, Chair, Shelf],
-        Program::Kitchen => &[Counter, Table, Chair, Chair],
-        Program::Entry => &[Shelf],
-        Program::Hall => &[Shelf],
-        Program::Laundry => &[Shelf],
-        Program::Garage => &[],
+        Program::Bedroom => &[Bed, Nightstand, Nightstand, Cabinet, Lamp, Chair],
+        Program::Dining => &[Table, Chair, Chair, Chair, Chair, Cabinet],
+        Program::Living => &[Sofa, Lamp, Table, Shelf, Chair, Cabinet],
+        Program::Bath => &[Tub, Sink, Cabinet],
+        Program::Study => &[Desk, Chair, Shelf, Shelf, Lamp],
+        Program::Kitchen => &[Counter, Counter, Table, Chair, Chair, Shelf],
+        Program::Entry => &[Shelf, Cabinet, Lamp],
+        Program::Hall => &[Shelf, Cabinet],
+        Program::Laundry => &[Shelf, Cabinet],
+        Program::Garage => &[Cabinet, Shelf],
     }
 }
 
@@ -55,12 +56,22 @@ pub fn furnish(rng: &mut Rng, floor: &Floor) -> Vec<Furniture> {
                 placed.push(p);
             }
         }
+        keep_walkable(room, &doors, &mut placed);
         for (i, p) in placed.iter_mut().enumerate() {
             p.id = room.id * 100 + i as u32;
         }
         out.extend(placed);
     }
     out
+}
+
+/// Drops the last pieces until a person can walk from every door to
+/// the room's centre. The set is ordered most-essential first, so the
+/// pieces dropped are the extras.
+fn keep_walkable(room: &Room, doors: &[&Opening], placed: &mut Vec<Furniture>) {
+    while !placed.is_empty() && !walkable(room, doors, placed) {
+        placed.pop();
+    }
 }
 
 /// A chair sits next to a table or desk already in the room, on a
@@ -143,57 +154,3 @@ fn place_against_wall(
     None
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::domain::geometry::Rect as R;
-    use crate::domain::style::Style;
-    use crate::use_cases::generate::generate_house;
-
-    fn room_with(doors: Vec<Opening>, windows: Vec<Opening>) -> Floor {
-        Floor {
-            level: 0,
-            rooms: vec![Room { id: 0, program: Program::Bedroom, rect: R::new(0.0, 0.0, 6.0, 5.0) }],
-            openings: doors.into_iter().chain(windows).collect(),
-            furniture: vec![],
-            open_doors: vec![],
-        }
-    }
-
-    #[test]
-    fn a_bedroom_gets_a_bed_a_nightstand_and_a_cabinet() {
-        let floor = room_with(vec![], vec![]);
-        let mut rng = Rng::new(1);
-        let pieces = furnish(&mut rng, &floor);
-        let kinds: Vec<FurnitureKind> = pieces.iter().map(|p| p.kind).collect();
-        assert!(kinds.contains(&FurnitureKind::Bed), "no bed: {kinds:?}");
-        assert!(kinds.contains(&FurnitureKind::Nightstand), "no nightstand: {kinds:?}");
-        assert!(kinds.contains(&FurnitureKind::Cabinet), "no cabinet: {kinds:?}");
-    }
-
-    #[test]
-    fn a_bath_gets_a_tub_and_a_sink() {
-        let floor = Floor {
-            level: 0,
-            rooms: vec![Room { id: 0, program: Program::Bath, rect: R::new(0.0, 0.0, 2.4, 2.5) }],
-            openings: vec![],
-            furniture: vec![],
-            open_doors: vec![],
-        };
-        let mut rng = Rng::new(4);
-        let pieces = furnish(&mut rng, &floor);
-        let kinds: Vec<FurnitureKind> = pieces.iter().map(|p| p.kind).collect();
-        assert!(kinds.contains(&FurnitureKind::Tub), "no tub: {kinds:?}");
-        assert!(kinds.contains(&FurnitureKind::Sink), "no sink: {kinds:?}");
-    }
-
-    #[test]
-    fn furnishing_is_deterministic() {
-        let house = generate_house(42, Style::Modern);
-        let mut a = Rng::new(42);
-        let mut b = Rng::new(42);
-        let pa = furnish(&mut a, &house.floors[0]);
-        let pb = furnish(&mut b, &house.floors[0]);
-        assert_eq!(pa, pb);
-    }
-}

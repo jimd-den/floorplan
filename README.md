@@ -47,13 +47,22 @@ buffer embedded as base64) — not voxels.
 - **Per floor**: a floor slab and a ceiling slab per room.
   **Stairs** for two-storey houses are solid stepped boxes in the
   ground hall.
-- **Roof**: a pitched gable over the footprint and garage, with a
-  0.4 m eave overhang and the ridge on the long axis; gable ends are
-  siding. The top floor keeps an interior ceiling under it. A porch
-  gets its own roof, posts, and steps.
+- **Roof**: each footprint rectangle gets its own pitched gable at its
+  own storey height — the main body at the top storey, single-storey
+  wings and the garage at one storey — with a 0.4 m eave overhang and
+  the ridge on the rectangle's long axis; gable ends are siding. The
+  top floor keeps an interior ceiling under it. A porch gets its own
+  roof, posts, and steps.
 - **Windows and doors**: four-member window frames with a glass pane,
   two jambs and a head per door, so an opening reads as a window or a
   door from both sides.
+- **Furniture**: every room gets a full set (bed, nightstands, cabinet,
+  lamp, chair; sofa, table, shelves, cabinet; counters, table, chairs;
+  and so on), placed against walls and cleared of door swings and
+  windows. A grid walkability pass drops the last pieces until a
+  person can walk from every door to the room's open area, so a full
+  house stays walkable. Rugs and surface clutter (books, dishes,
+  plants) fill the rooms without blocking circulation.
 - **Grounds** (neighborhood mesh): a driveway pad on the garage side
   with a connector to the street where the route is clear, and one or
   two trees per lot in the back yard.
@@ -61,7 +70,7 @@ buffer embedded as base64) — not voxels.
   bedroom, bath, hall, entry, study, laundry, garage) plus
   wall/ceiling/roof/stairs/porch, siding, trim, window frame, glass,
   baseboard, door frame, driveway, trunk, leaf, and clutter.
-- **Budget**: a house stays under 7,000 vertices / 10,000 faces and
+- **Budget**: a house stays under 7,000 vertices / 11,000 faces and
   the 2×2 neighborhood under 90,000 / 140,000, guarded by
   `tests/mesh_budget.rs`.
 
@@ -132,7 +141,7 @@ reads the results out of linear memory (protocol v2, see
 JSON payloads are the same text the CLI writers emit; mesh payloads
 are a binary `FPM1` blob (positions, indices, material ids, material
 table). The built module is committed as base64 at
-`wasm/floorplan.wasm.b64` (release, 280,852 bytes) — the binary
+`wasm/floorplan.wasm.b64` (release, 286,772 bytes) — the binary
 itself can't travel through this repo's text-only push path — and
 decodes back with one command:
 
@@ -159,16 +168,18 @@ floorplan render --seed 42 --view street --blocks 2x2 --out street.png
 ```
 
 Views are `exterior` (a three-quarter view of the footprint), `interior`
-(the largest ground-floor room, standing clear of furniture), and
-`street` (the busiest street, looking along it). Output is 1280×720,
-default `render-<seed>-<view>.png`. `docs/screenshots/` holds:
+(the largest furnished ground-floor room, looking across at its
+furniture), and `street` (the busiest street, looking along it).
+Output is 1280×720, default `render-<seed>-<view>.png`.
+`docs/screenshots/` holds:
 
-- `seed42-modern-exterior.png` — gable roof, siding, framed windows.
-- `seed42-modern-interior.png` — painted walls, baseboards, window,
-  door frame, table and clutter.
-- `seed42-neighborhood-street.png` — the M6 neighborhood, with trees.
-- `seed0-colonial-exterior.png` — two storeys and a porch with steps,
-  posts, and its own roof.
+- `seed42-modern-exterior.png` — per-wing gable roofs, siding, framed
+  windows.
+- `seed42-modern-interior.png` — a furnished living room: sofa, coffee
+  table, cabinet, rug, clutter, on a plank floor.
+- `seed42-neighborhood-street.png` — the dense neighborhood, with trees.
+- `seed0-colonial-exterior.png` — two storeys with single-storey wings
+  and a porch with steps, posts, and its own roof.
 
 The M6 pass is ADR 0009; the screenshots regenerate from the same
 binary with the commands above.
