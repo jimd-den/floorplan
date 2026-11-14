@@ -101,16 +101,16 @@ for (const seed of SEEDS) {
     check(`neighborhood mesh deterministic seed ${seed} ${blocks}`, Buffer.compare(Buffer.from(p), Buffer.from(p2)) === 0);
     if (blocks === '2x2') {
       let verts = 8 * (nb.streets.length + nb.lots.length);
-      let faces = 12 * (nb.streets.length + nb.lots.length);
+      let houseExpected = 0;
       for (const house of nb.houses) {
         const c = nativeHouseObj(house.seed, house.style);
         verts += c.verts;
-        faces += c.faces;
+        houseExpected += c.faces;
       }
       check(`neighborhood mesh verts seed ${seed} ${blocks}`, m.verts >= verts, `${m.verts} vs ${verts}`);
       const groundNames = new Set(['street', 'lot', 'driveway', 'trunk', 'leaf']);
       const houseFaces = [...m.matIds].filter((id) => !groundNames.has(m.names[id])).length;
-      check(`neighborhood house faces seed ${seed} ${blocks}`, houseFaces === faces, `${houseFaces} vs ${faces}`);
+      check(`neighborhood house faces seed ${seed} ${blocks}`, houseFaces === houseExpected, `${houseFaces} vs ${houseExpected}`);
     }
   }
 

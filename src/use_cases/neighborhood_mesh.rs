@@ -14,16 +14,16 @@ use crate::use_cases::extrude::{extrude, material_table};
 use crate::use_cases::grounds::add_grounds;
 
 /// The street material id, appended after the house table.
-pub const STREET_MATERIAL: u32 = 29;
+pub const STREET_MATERIAL: u32 = 39;
 /// The lot material id, appended after the house table.
-pub const LOT_MATERIAL: u32 = 30;
+pub const LOT_MATERIAL: u32 = 40;
 
 /// The material table for a neighborhood mesh: the house table
 /// plus street asphalt and lot grass.
 pub fn neighborhood_material_table() -> Vec<Material> {
     let mut table = material_table();
-    table.push(Material { name: "street", color: [0.34, 0.34, 0.36] });
-    table.push(Material { name: "lot", color: [0.45, 0.62, 0.38] });
+    table.push(Material { name: "street", color: [0.24, 0.25, 0.27] });
+    table.push(Material { name: "lot", color: [0.34, 0.56, 0.26] });
     table
 }
 

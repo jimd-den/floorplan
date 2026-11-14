@@ -5,9 +5,14 @@ use floorplan::domain::mesh::Mesh;
 use floorplan::domain::model::Program;
 use floorplan::domain::style::Style;
 use floorplan::use_cases::generate::generate_house;
-use floorplan::use_cases::grounds::{add_grounds, fence_box, tree_positions, walkway_box};
+use floorplan::use_cases::grounds::{
+    add_grounds, centerline_boxes, fence_box, sidewalk_box, tree_positions, walkway_box,
+};
 use floorplan::use_cases::materials::{DRIVEWAY, LEAF, TRUNK, material_table};
 use floorplan::use_cases::neighborhood::generate_neighborhood;
+use floorplan::use_cases::neighborhood_mesh::{
+    LOT_MATERIAL, STREET_MATERIAL, neighborhood_material_table,
+};
 use floorplan::use_cases::porch::add_garage_door;
 
 fn grounded(seed: u32) -> Mesh {
@@ -72,6 +77,26 @@ fn a_garage_room_gets_an_overhead_garage_door() {
         mesh.vertices.iter().any(|v| (v[2] - z_front).abs() < 0.2),
         "garage door is not on the garage front wall"
     );
+}
+
+#[test]
+fn street_and_lot_material_constants_match_the_neighborhood_table() {
+    let table = neighborhood_material_table();
+    assert_eq!(table[STREET_MATERIAL as usize].name, "street");
+    assert_eq!(table[LOT_MATERIAL as usize].name, "lot");
+}
+
+#[test]
+fn every_lot_gets_a_sidewalk_and_every_street_gets_centerlines() {
+    let n = generate_neighborhood(42, (2, 2));
+    for index in 0..n.lots.len() {
+        let sw = sidewalk_box(&n, index);
+        assert!(sw.max[0] > sw.min[0] && sw.max[2] > sw.min[2], "empty sidewalk");
+        assert!(sw.max[1] > 0.02, "sidewalk must be raised above the street");
+    }
+    for s in &n.streets {
+        assert!(!centerline_boxes(s).is_empty(), "street has no centerline dashes");
+    }
 }
 
 #[test]

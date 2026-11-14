@@ -57,7 +57,7 @@ pub fn material_table() -> Vec<Material> {
         Material { name: "glass", color: [0.55, 0.72, 0.82] },
         Material { name: "baseboard", color: [0.90, 0.88, 0.84] },
         Material { name: "door_frame", color: [0.88, 0.86, 0.82] },
-        Material { name: "driveway", color: [0.55, 0.55, 0.56] },
+        Material { name: "driveway", color: [0.74, 0.73, 0.70] },
         Material { name: "trunk", color: [0.42, 0.30, 0.20] },
         Material { name: "leaf", color: [0.28, 0.48, 0.26] },
         Material { name: "clutter", color: [0.60, 0.45, 0.35] },

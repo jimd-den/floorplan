@@ -12,9 +12,14 @@ use crate::domain::neighborhood::{Neighborhood, PlacedHouse, house_extent, place
 use crate::frameworks_drivers::rng::Rng;
 use crate::use_cases::materials::{DRIVEWAY, LEAF, TRUNK};
 
-/// Adds every driveway, front walkway, back-yard fence, and tree to a
-/// neighborhood mesh.
+/// Adds every driveway, front walkway, sidewalk, road centerline,
+/// back-yard fence, and tree to a neighborhood mesh.
 pub fn add_grounds(mesh: &mut Mesh, n: &Neighborhood) {
+    for s in &n.streets {
+        for dash in centerline_boxes(s) {
+            mesh.add_box(dash, DRIVEWAY);
+        }
+    }
     for h in &n.houses {
         if let Some(garage) = h.house.footprint.garage {
             add_driveway(mesh, n, h, garage);
@@ -22,6 +27,7 @@ pub fn add_grounds(mesh: &mut Mesh, n: &Neighborhood) {
         mesh.add_box(walkway_box(n, h), DRIVEWAY);
     }
     for index in 0..n.lots.len() {
+        mesh.add_box(sidewalk_box(n, index), DRIVEWAY);
         mesh.add_box(fence_box(n, index), TRUNK);
         add_trees(mesh, n, index);
     }
@@ -145,4 +151,47 @@ pub fn fence_box(n: &Neighborhood, index: usize) -> Box3 {
         Side::East => (lot.x + 0.2, lot.y + 0.5, lot.x + 0.3, lot.bottom() - 0.5),
     };
     Box3::new([x0 as f32, 0.0, z0 as f32], [x1 as f32, 1.1, z1 as f32])
+}
+
+/// A raised 1.6 m concrete sidewalk along a lot's street-fronting edge.
+pub fn sidewalk_box(n: &Neighborhood, index: usize) -> Box3 {
+    let lot = n.lots[index].rect;
+    let side = street_side(lot, n.streets[n.lots[index].street].rect);
+    let (x0, z0, x1, z1) = match side {
+        Side::North => (lot.x, lot.y, lot.right(), lot.y + 1.6),
+        Side::South => (lot.x, lot.bottom() - 1.6, lot.right(), lot.bottom()),
+        Side::West => (lot.x, lot.y, lot.x + 1.6, lot.bottom()),
+        Side::East => (lot.right() - 1.6, lot.y, lot.right(), lot.bottom()),
+    };
+    Box3::new([x0 as f32, -0.015, z0 as f32], [x1 as f32, 0.04, z1 as f32])
+}
+
+/// Dashed centreline boxes along a street.
+pub fn centerline_boxes(street: &crate::domain::neighborhood::Street) -> Vec<Box3> {
+    let r = street.rect;
+    let mut out = Vec::new();
+    if street.horizontal {
+        let cz = (r.y + r.d / 2.0) as f32;
+        let mut x = r.x + 2.0;
+        while x + 2.5 <= r.right() - 1.0 {
+            out.push(Box3::new([x as f32, 0.002, cz - 0.09], [(x + 2.5) as f32, 0.012, cz + 0.09]));
+            x += 7.5;
+        }
+        if out.is_empty() {
+            let cx = (r.x + r.w / 2.0) as f32;
+            out.push(Box3::new([cx - 1.0, 0.002, cz - 0.09], [cx + 1.0, 0.012, cz + 0.09]));
+        }
+    } else {
+        let cx = (r.x + r.w / 2.0) as f32;
+        let mut z = r.y + 2.0;
+        while z + 2.5 <= r.bottom() - 1.0 {
+            out.push(Box3::new([cx - 0.09, 0.002, z as f32], [cx + 0.09, 0.012, (z + 2.5) as f32]));
+            z += 7.5;
+        }
+        if out.is_empty() {
+            let cz = (r.y + r.d / 2.0) as f32;
+            out.push(Box3::new([cx - 0.09, 0.002, cz - 1.0], [cx + 0.09, 0.012, cz + 1.0]));
+        }
+    }
+    out
 }
