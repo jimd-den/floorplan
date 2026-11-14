@@ -20,6 +20,7 @@ pub mod render;
 pub mod shade;
 pub mod svg;
 pub mod svg_openings;
+pub mod texture;
 pub mod wasm;
 #[cfg(target_arch = "wasm32")]
 pub mod wasm_exports;

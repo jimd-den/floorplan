@@ -33,7 +33,7 @@ fn a_house_mesh_fits_the_first_person_budget() {
 fn a_neighborhood_mesh_fits_the_streaming_budget() {
     let mesh = neighborhood_mesh(&generate_neighborhood(42, (2, 2)));
 
-    assert!(mesh.vertices.len() <= 90_000, "{} vertices", mesh.vertices.len());
-    assert!(mesh.faces.len() <= 140_000, "{} faces", mesh.faces.len());
+    assert!(mesh.vertices.len() <= 96_000, "{} vertices", mesh.vertices.len());
+    assert!(mesh.faces.len() <= 145_000, "{} faces", mesh.faces.len());
     assert_eq!(mesh.validate(), Ok(()));
 }

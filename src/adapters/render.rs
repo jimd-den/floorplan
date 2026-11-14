@@ -8,6 +8,7 @@
 
 use crate::adapters::camera::clip_near;
 use crate::adapters::shade::{apply_haze, face_shade};
+use crate::adapters::texture::texture_scale;
 use crate::domain::mesh::Mesh;
 
 pub use crate::adapters::camera::{Camera, Viewport};
@@ -45,11 +46,9 @@ pub fn render(mesh: &Mesh, camera: &Camera, viewport: Viewport) -> Image {
     let mut depth = vec![f32::INFINITY; viewport.width * viewport.height];
     let forward = camera.forward();
     for (i, face) in mesh.faces.iter().enumerate() {
-        let color = mesh
-            .material_table
-            .get(mesh.materials[i] as usize)
-            .map(|m| m.color)
-            .unwrap_or([0.8, 0.8, 0.8]);
+        let mat = mesh.material_table.get(mesh.materials[i] as usize);
+        let color = mat.map(|m| m.color).unwrap_or([0.8, 0.8, 0.8]);
+        let mat_name = mat.map(|m| m.name).unwrap_or("");
         let v = [
             mesh.vertices[face[0] as usize],
             mesh.vertices[face[1] as usize],
@@ -58,9 +57,9 @@ pub fn render(mesh: &Mesh, camera: &Camera, viewport: Viewport) -> Image {
         let Some(normal) = normal(v[0], v[1], v[2]) else { continue };
         let shade = face_shade(normal, forward);
         let rgb = [
-            (color[0] * shade * 255.0).clamp(0.0, 255.0) as u8,
-            (color[1] * shade * 255.0).clamp(0.0, 255.0) as u8,
-            (color[2] * shade * 255.0).clamp(0.0, 255.0) as u8,
+            color[0] * shade * 255.0,
+            color[1] * shade * 255.0,
+            color[2] * shade * 255.0,
         ];
         let camera_space = [camera.camera_space(v[0]), camera.camera_space(v[1]), camera.camera_space(v[2])];
         let poly = clip_near(&camera_space);
@@ -70,8 +69,8 @@ pub fn render(mesh: &Mesh, camera: &Camera, viewport: Viewport) -> Image {
         let pts: Vec<(f32, f32, f32)> =
             poly.iter().map(|c| camera.project_camera(*c, viewport)).collect();
         for k in 1..pts.len() - 1 {
-            let tri = Triangle { p: [pts[0], pts[k], pts[k + 1]], rgb };
-            raster(&mut image, &mut depth, &tri);
+            let tri = Triangle { p: [pts[0], pts[k], pts[k + 1]], rgb, mat_name };
+            raster(&mut image, &mut depth, &tri, camera, viewport);
         }
     }
     image
@@ -79,10 +78,11 @@ pub fn render(mesh: &Mesh, camera: &Camera, viewport: Viewport) -> Image {
 
 struct Triangle {
     p: [(f32, f32, f32); 3],
-    rgb: [u8; 3],
+    rgb: [f32; 3],
+    mat_name: &'static str,
 }
 
-fn raster(image: &mut Image, depth: &mut [f32], tri: &Triangle) {
+fn raster(image: &mut Image, depth: &mut [f32], tri: &Triangle, camera: &Camera, viewport: Viewport) {
     let area = edge(xy(tri.p[0]), xy(tri.p[1]), xy(tri.p[2]));
     if area.abs() < 1e-6 {
         return;
@@ -108,7 +108,13 @@ fn raster(image: &mut Image, depth: &mut [f32], tri: &Triangle) {
             let idx = y * image.width + x;
             if z < depth[idx] {
                 depth[idx] = z;
-                image.pixels[idx] = apply_haze(tri.rgb, z);
+                let tex = texture_scale(tri.mat_name, camera.unproject(px, py, z, viewport));
+                let rgb = [
+                    (tri.rgb[0] * tex).clamp(0.0, 255.0) as u8,
+                    (tri.rgb[1] * tex).clamp(0.0, 255.0) as u8,
+                    (tri.rgb[2] * tex).clamp(0.0, 255.0) as u8,
+                ];
+                image.pixels[idx] = apply_haze(rgb, z);
             }
         }
     }

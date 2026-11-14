@@ -67,6 +67,25 @@ impl Camera {
         let sy = (0.5 - ndc_y * 0.5) * viewport.height as f32;
         (sx, sy, -c[2])
     }
+
+    /// Reconstructs the 3D world point for screen pixel `(sx, sy)` at
+    /// camera depth `z`.
+    pub(crate) fn unproject(&self, sx: f32, sy: f32, z: f32, viewport: Viewport) -> [f32; 3] {
+        let aspect = viewport.width as f32 / viewport.height as f32;
+        let f = 1.0 / (self.fov / 2.0).tan();
+        let ndc_x = (sx / viewport.width as f32 - 0.5) * 2.0;
+        let ndc_y = (0.5 - sy / viewport.height as f32) * 2.0;
+        let x_cam = ndc_x * aspect * z / f;
+        let y_cam = ndc_y * z / f;
+        let z_cam = -z;
+        let (sy_a, cy_a) = self.yaw.sin_cos();
+        let (sp_a, cp_a) = self.pitch.sin_cos();
+        let dy = y_cam * cp_a - z_cam * sp_a;
+        let z_rot = y_cam * sp_a + z_cam * cp_a;
+        let dx = x_cam * cy_a - z_rot * sy_a;
+        let dz = x_cam * sy_a + z_rot * cy_a;
+        [self.eye[0] + dx, self.eye[1] + dy, self.eye[2] + dz]
+    }
 }
 
 /// Output dimensions in pixels.

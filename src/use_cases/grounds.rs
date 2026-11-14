@@ -91,26 +91,26 @@ fn add_trees(mesh: &mut Mesh, n: &Neighborhood, index: usize) {
     }
 }
 
-/// The tree positions on one lot: in the back yard, clear of the
-/// house's back setback, spread deterministically along the lot.
+/// The tree positions on one lot: one street-side front-yard tree and
+/// one back-yard tree, both clear of the house and inside the lot.
 pub fn tree_positions(n: &Neighborhood, index: usize) -> Vec<(f64, f64)> {
     let lot = n.lots[index].rect;
     let side = street_side(lot, n.streets[n.lots[index].street].rect);
     let mut rng = Rng::new(n.seed ^ (index as u32).wrapping_mul(0x9E37_79B9));
-    let count = 1 + rng.range_usize(2);
-    let spread = rng.range_f64(-2.5, 2.5);
-    let mut out = vec![];
-    for i in 0..count {
-        let offset = spread + i as f64 * 2.5;
-        let (x, z) = match side {
-            Side::North => (clamp(lot.x + lot.w / 2.0 + offset, lot.x + 1.0, lot.right() - 1.0), lot.bottom() - 1.5),
-            Side::South => (clamp(lot.x + lot.w / 2.0 + offset, lot.x + 1.0, lot.right() - 1.0), lot.y + 1.5),
-            Side::West => (lot.right() - 1.5, clamp(lot.y + lot.d / 2.0 + offset, lot.y + 1.0, lot.bottom() - 1.0)),
-            Side::East => (lot.x + 1.5, clamp(lot.y + lot.d / 2.0 + offset, lot.y + 1.0, lot.bottom() - 1.0)),
-        };
-        out.push((x, z));
-    }
-    out
+    let spread = rng.range_f64(-2.0, 2.0);
+    let front = match side {
+        Side::North => (clamp(lot.x + 1.8, lot.x + 1.0, lot.right() - 1.0), lot.y + 2.8),
+        Side::South => (clamp(lot.right() - 1.8, lot.x + 1.0, lot.right() - 1.0), lot.bottom() - 2.8),
+        Side::West => (lot.x + 2.8, clamp(lot.y + 1.8, lot.y + 1.0, lot.bottom() - 1.0)),
+        Side::East => (lot.right() - 2.8, clamp(lot.bottom() - 1.8, lot.y + 1.0, lot.bottom() - 1.0)),
+    };
+    let back = match side {
+        Side::North => (clamp(lot.x + lot.w / 2.0 + spread, lot.x + 1.0, lot.right() - 1.0), lot.bottom() - 1.5),
+        Side::South => (clamp(lot.x + lot.w / 2.0 + spread, lot.x + 1.0, lot.right() - 1.0), lot.y + 1.5),
+        Side::West => (lot.right() - 1.5, clamp(lot.y + lot.d / 2.0 + spread, lot.y + 1.0, lot.bottom() - 1.0)),
+        Side::East => (lot.x + 1.5, clamp(lot.y + lot.d / 2.0 + spread, lot.y + 1.0, lot.bottom() - 1.0)),
+    };
+    vec![front, back]
 }
 
 fn clamp(v: f64, lo: f64, hi: f64) -> f64 {

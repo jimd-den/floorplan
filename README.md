@@ -125,13 +125,14 @@ reads the results out of linear memory (protocol v2, see
 `docs/adr/0004-neighborhood-wasm.md` and `docs/adr/0007-streaming-chunks.md`): `fp_version`,
 `fp_alloc`/`fp_free`, `fp_last_len`, `fp_house_json`,
 `fp_neighborhood_json`, `fp_house_mesh`, `fp_neighborhood_mesh`,
+`fp_neighborhood_density_json`, `fp_neighborhood_density_mesh`,
 `fp_chunk_json`, `fp_chunk_mesh`, `fp_house_lights`,
 `fp_house_lights_toggled`, `fp_daylight`, `fp_light_toggle_state`,
 `fp_house_tasks`, `fp_haunt_step`, `fp_house_interact_mesh`.
 JSON payloads are the same text the CLI writers emit; mesh payloads
 are a binary `FPM1` blob (positions, indices, material ids, material
 table). The built module is committed as base64 at
-`wasm/floorplan.wasm.b64` (release, 277,218 bytes) — the binary
+`wasm/floorplan.wasm.b64` (release, 280,852 bytes) — the binary
 itself can't travel through this repo's text-only push path — and
 decodes back with one command:
 
