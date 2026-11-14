@@ -7,7 +7,8 @@ use crate::adapters::wasm::{
     HauntStepInput, PROTOCOL_VERSION, chunk_json, chunk_mesh_bytes, daylight_json,
     haunt_step_json, house_interact_mesh_bytes, house_json, house_lights_json,
     house_lights_toggled_json, house_mesh_bytes, house_tasks_json, light_toggle_state,
-    neighborhood_json, neighborhood_mesh_bytes,
+    neighborhood_density_json, neighborhood_density_mesh_bytes, neighborhood_json,
+    neighborhood_mesh_bytes,
 };
 
 static LAST_LEN: AtomicU32 = AtomicU32::new(0);
@@ -97,6 +98,28 @@ pub extern "C" fn fp_chunk_json(seed: u32, cx: i32, cz: i32) -> *mut u8 {
 #[unsafe(no_mangle)]
 pub extern "C" fn fp_chunk_mesh(seed: u32, cx: i32, cz: i32) -> *mut u8 {
     leak_payload(chunk_mesh_bytes(seed, cx, cz))
+}
+
+/// The neighborhood JSON at a chosen density (`0` low, `1` medium, `2` high).
+#[unsafe(no_mangle)]
+pub extern "C" fn fp_neighborhood_density_json(
+    seed: u32,
+    cols: u32,
+    rows: u32,
+    density: u32,
+) -> *mut u8 {
+    leak_payload(neighborhood_density_json(seed, cols, rows, density))
+}
+
+/// The neighborhood mesh at a chosen density (`0` low, `1` medium, `2` high).
+#[unsafe(no_mangle)]
+pub extern "C" fn fp_neighborhood_density_mesh(
+    seed: u32,
+    cols: u32,
+    rows: u32,
+    density: u32,
+) -> *mut u8 {
+    leak_payload(neighborhood_density_mesh_bytes(seed, cols, rows, density))
 }
 
 /// The lights a house owns, as JSON. Null on an invalid style index.

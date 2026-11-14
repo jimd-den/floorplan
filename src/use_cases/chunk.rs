@@ -8,8 +8,9 @@
 
 use crate::domain::chunk::{Chunk, ChunkState, DEFAULT_CHUNK_BLOCKS};
 use crate::domain::geometry::Rect;
+use crate::domain::layout::Density;
 use crate::domain::neighborhood::Neighborhood;
-use crate::use_cases::neighborhood::generate_neighborhood;
+use crate::use_cases::neighborhood::{generate_neighborhood, generate_neighborhood_density};
 
 /// The world-space spacing between chunk origins, in metres. It is
 /// larger than any 2x2 neighborhood, so adjacent chunks never touch.
@@ -45,7 +46,11 @@ pub fn chunk_origin(cx: i32, cz: i32) -> (f64, f64) {
 /// DEFAULT_CHUNK_BLOCKS)`.
 pub fn build_chunk(world: u32, cx: i32, cz: i32) -> Chunk {
     let seed = chunk_seed(world, cx, cz);
-    let neighborhood = generate_neighborhood(seed, DEFAULT_CHUNK_BLOCKS);
+    let neighborhood = if cx == 0 && cz == 0 {
+        generate_neighborhood(seed, DEFAULT_CHUNK_BLOCKS)
+    } else {
+        generate_neighborhood_density(seed, DEFAULT_CHUNK_BLOCKS, Density::from_seed(seed))
+    };
     let (dx, dz) = chunk_origin(cx, cz);
     Chunk {
         cx,

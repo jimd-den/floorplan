@@ -7,11 +7,11 @@
 //! generated house fits its lot with setbacks (max house extent
 //! 26 x 16 m, proven in domain::neighborhood).
 
-use crate::domain::layout::Layout;
+use crate::domain::layout::{Density, Layout};
 use crate::domain::neighborhood::Neighborhood;
 use crate::frameworks_drivers::rng::Rng;
 use crate::use_cases::layout::plan_layout;
-use crate::use_cases::lots::{lay_block, lay_court};
+use crate::use_cases::lots::{lay_block_with_density, lay_court_with_density};
 use crate::use_cases::quant;
 
 /// Street width, in metres.
@@ -36,6 +36,26 @@ pub fn generate_neighborhood(seed: u32, blocks: (u32, u32)) -> Neighborhood {
 /// Builds a neighborhood in a chosen layout family. The test
 /// entry point for verifying the invariants per family.
 pub fn generate_neighborhood_layout(seed: u32, blocks: (u32, u32), layout: Layout) -> Neighborhood {
+    generate_neighborhood_full(seed, blocks, layout, Density::Low)
+}
+
+/// Builds a neighborhood at a chosen residential density (`Low`,
+/// `Medium`, or `High`).
+pub fn generate_neighborhood_density(
+    seed: u32,
+    blocks: (u32, u32),
+    density: Density,
+) -> Neighborhood {
+    generate_neighborhood_full(seed, blocks, Layout::from_seed(seed), density)
+}
+
+/// Builds a neighborhood in a chosen layout family and density tier.
+pub fn generate_neighborhood_full(
+    seed: u32,
+    blocks: (u32, u32),
+    layout: Layout,
+    density: Density,
+) -> Neighborhood {
     let mut rng = Rng::new(seed);
     let block = quant(rng.range_f64(76.0, 96.0));
     let plan = plan_layout(&mut rng, layout, blocks, block);
@@ -43,8 +63,15 @@ pub fn generate_neighborhood_layout(seed: u32, blocks: (u32, u32), layout: Layou
     let mut houses = Vec::new();
     for b in &plan.blocks {
         match &b.court {
-            Some(_) => lay_court(&mut rng, &mut lots, &mut houses, b, &plan.streets),
-            None => lay_block(&mut rng, &mut lots, &mut houses, b.rect, (b.north, b.south, b.west, b.east)),
+            Some(_) => lay_court_with_density(&mut rng, &mut lots, &mut houses, b, &plan.streets, density),
+            None => lay_block_with_density(
+                &mut rng,
+                &mut lots,
+                &mut houses,
+                b.rect,
+                (b.north, b.south, b.west, b.east),
+                density,
+            ),
         }
     }
     Neighborhood { seed, blocks, layout, streets: plan.streets, lots, houses }

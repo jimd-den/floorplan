@@ -20,12 +20,13 @@ use crate::adapters::json::render_json;
 use crate::adapters::light_json::{render_daylight_json, render_lights_json};
 use crate::adapters::neighborhood_json::render_neighborhood_json;
 use crate::domain::interaction::Interaction;
+use crate::domain::layout::Density;
 use crate::domain::light::{Daylight, LightState};
 use crate::domain::style::Style;
 use crate::use_cases::chunk::build_chunk;
 use crate::use_cases::extrude::extrude;
 use crate::use_cases::generate::generate_house;
-use crate::use_cases::neighborhood::generate_neighborhood;
+use crate::use_cases::neighborhood::{generate_neighborhood, generate_neighborhood_density};
 use crate::use_cases::neighborhood_mesh::neighborhood_mesh;
 
 pub use crate::adapters::haunt_json::{
@@ -128,6 +129,36 @@ pub fn house_lights_toggled_json(
 pub fn daylight_json(minutes: u32, held: bool) -> Vec<u8> {
     let daylight = if held { Daylight::held_at(minutes) } else { Daylight::at(minutes) };
     render_daylight_json(&daylight).into_bytes()
+}
+
+/// The neighborhood JSON for a seed, block count, and density tier
+/// (`0` low, `1` medium, `2` high).
+pub fn neighborhood_density_json(
+    seed: u32,
+    cols: u32,
+    rows: u32,
+    density_index: u32,
+) -> Result<Vec<u8>, String> {
+    let Some(density) = Density::from_index(density_index) else {
+        return Err(format!("density index {density_index} out of range (0..3)"));
+    };
+    let n = generate_neighborhood_density(seed, (cols, rows), density);
+    Ok(render_neighborhood_json(&n).into_bytes())
+}
+
+/// The neighborhood mesh for a seed, block count, and density tier
+/// (`0` low, `1` medium, `2` high).
+pub fn neighborhood_density_mesh_bytes(
+    seed: u32,
+    cols: u32,
+    rows: u32,
+    density_index: u32,
+) -> Result<Vec<u8>, String> {
+    let Some(density) = Density::from_index(density_index) else {
+        return Err(format!("density index {density_index} out of range (0..3)"));
+    };
+    let n = generate_neighborhood_density(seed, (cols, rows), density);
+    Ok(mesh_bytes(&neighborhood_mesh(&n)))
 }
 
 /// The state a switch produces for a light-state code, or `None` when

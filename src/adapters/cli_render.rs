@@ -7,9 +7,10 @@
 
 use crate::adapters::png::encode_rgb;
 use crate::adapters::render::{render as rasterize, Camera, Viewport};
+use crate::domain::layout::Density;
 use crate::domain::style::Style;
 use crate::use_cases::generate::generate_house;
-use crate::use_cases::neighborhood::generate_neighborhood;
+use crate::use_cases::neighborhood::generate_neighborhood_density;
 use crate::use_cases::scene::{house_scene, neighborhood_scene};
 use crate::use_cases::viewpoint::{house_pose, street_pose, View};
 
@@ -27,7 +28,7 @@ pub(crate) fn render(
 ) -> Result<(), String> {
     let (mesh, pose) = match view {
         View::Street => {
-            let n = generate_neighborhood(seed, blocks);
+            let n = generate_neighborhood_density(seed, blocks, Density::High);
             let pose = street_pose(&n);
             (neighborhood_scene(&n), pose)
         }
