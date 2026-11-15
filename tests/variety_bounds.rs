@@ -13,10 +13,21 @@ use floorplan::use_cases::variety::{
 };
 
 #[test]
-fn house_variety_lower_bound_exceeds_millions() {
+fn house_variety_lower_bound_exceeds_one_trillion() {
     let bound = house_variety_lower_bound();
-    assert!(bound >= 1_000_000, "house bound {bound} < 1,000,000");
-    assert_eq!(bound, 4_463_424_000);
+    assert!(bound > 1_000_000_000_000, "house bound {bound} <= 10^12");
+    assert_eq!(bound, 5_891_719_680_000);
+}
+
+#[test]
+fn ten_thousand_seeds_give_ten_thousand_distinct_plan_hashes() {
+    let styles = Style::all();
+    let mut hashes = std::collections::HashSet::with_capacity(10_000);
+    for seed in 0..10_000u32 {
+        let house = generate_house(seed, styles[(seed % 6) as usize]);
+        hashes.insert(plan_hash(&house));
+    }
+    assert_eq!(hashes.len(), 10_000, "only {} distinct plans in 10,000 seeds", hashes.len());
 }
 
 #[test]

@@ -12,12 +12,18 @@ use crate::use_cases::quant;
 pub(crate) fn choose_garage_y(rooms: &[Room], garage: Rect, depth: f64) -> f64 {
     let mut best_y = garage.y;
     let mut best_score = windowless_habitable(rooms, garage, garage.y);
+    if best_score == 0 {
+        return best_y;
+    }
     let mut gy = 0.0;
     while gy <= depth - garage.d + 1e-9 {
         let score = windowless_habitable(rooms, garage, gy);
         if score < best_score {
             best_score = score;
             best_y = gy;
+            if best_score == 0 {
+                break;
+            }
         }
         gy = quant(gy + 0.1);
     }

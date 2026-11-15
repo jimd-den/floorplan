@@ -94,40 +94,48 @@ pub fn walkable(room: &Room, doors: &[&Opening], placed: &[Furniture]) -> bool {
     if doors.is_empty() {
         return true;
     }
-    let cell = 0.2;
+    let cell = 0.25;
     let nx = ((room.rect.w / cell).ceil() as usize).max(1);
     let nz = ((room.rect.d / cell).ceil() as usize).max(1);
     let mut blocked = vec![false; nx * nz];
+    let mut sum_i = 0usize;
+    let mut sum_j = 0usize;
+    let mut count = 0usize;
     for j in 0..nz {
+        let z = room.rect.y + (j as f64 + 0.5) * cell;
         for i in 0..nx {
             let x = room.rect.x + (i as f64 + 0.5) * cell;
-            let z = room.rect.y + (j as f64 + 0.5) * cell;
-            blocked[j * nx + i] = placed.iter().any(|p| {
+            let b = placed.iter().any(|p| {
                 x >= p.rect.x - 0.15
                     && x <= p.rect.right() + 0.15
                     && z >= p.rect.y - 0.15
                     && z <= p.rect.bottom() + 0.15
             });
+            blocked[j * nx + i] = b;
+            if !b {
+                sum_i += i;
+                sum_j += j;
+                count += 1;
+            }
         }
     }
-    let free: Vec<(usize, usize)> = (0..nz)
-        .flat_map(|j| (0..nx).map(move |i| (i, j)))
-        .filter(|&(i, j)| !blocked[j * nx + i])
-        .collect();
-    if free.is_empty() {
+    if count == 0 {
         return false;
     }
-    let (sum_i, sum_j) = free.iter().fold((0usize, 0usize), |(si, sj), &(i, j)| (si + i, sj + j));
-    let (ci, cj) = (sum_i as f64 / free.len() as f64, sum_j as f64 / free.len() as f64);
-    let target = free
-        .iter()
-        .min_by(|&&(i1, j1), &&(i2, j2)| {
-            let d1 = (i1 as f64 - ci).powi(2) + (j1 as f64 - cj).powi(2);
-            let d2 = (i2 as f64 - ci).powi(2) + (j2 as f64 - cj).powi(2);
-            d1.partial_cmp(&d2).unwrap_or(std::cmp::Ordering::Equal)
-        })
-        .copied()
-        .unwrap();
+    let (ci, cj) = (sum_i as f64 / count as f64, sum_j as f64 / count as f64);
+    let mut target = (0usize, 0usize);
+    let mut best_d = f64::INFINITY;
+    for j in 0..nz {
+        for i in 0..nx {
+            if !blocked[j * nx + i] {
+                let d = (i as f64 - ci).powi(2) + (j as f64 - cj).powi(2);
+                if d < best_d {
+                    best_d = d;
+                    target = (i, j);
+                }
+            }
+        }
+    }
     doors.iter().all(|o| {
         let (dx, dz) = door_inner_point(room, o);
         let si = ((dx - room.rect.x) / cell).floor() as usize;

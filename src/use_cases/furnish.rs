@@ -148,7 +148,7 @@ fn place_against_wall(
             if fits(room, kind, &rect, doors, windows, placed) {
                 return Some(Furniture::new(0, kind, room.id, rect, facing));
             }
-            at = (at * 10.0).round() / 10.0 + 0.1;
+            at += 0.2;
         }
     }
     None

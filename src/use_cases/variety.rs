@@ -93,10 +93,11 @@ pub fn neighborhood_hash(n: &Neighborhood) -> u64 {
 }
 
 /// Conservative lower bound on distinct houses across the six styles:
-/// 6 styles × 861 footprints × 2 room counts × 40 first cuts ×
-/// 50 door positions × 8 entry positions × 27 window widths.
+/// 6 styles × 861 footprints × 2 room counts × 40 first cuts × 12 second cuts ×
+/// 10 third cuts × 50 door positions × 8 entry positions × 27 window widths ×
+/// 11 window positions = 5,891,719,680,000 (> 5.89 × 10¹² > 10¹²).
 pub fn house_variety_lower_bound() -> u64 {
-    6 * 861 * 2 * 40 * 50 * 8 * 27
+    6 * 861 * 2 * 40 * 12 * 10 * 50 * 8 * 27 * 11
 }
 
 /// Conservative lower bound on distinct 2x2 neighborhoods from street,
