@@ -6,16 +6,17 @@
 //! are siding on the exterior and painted inside; the roof is a
 //! pitched gable above an interior ceiling.
 
-use crate::domain::mesh::{Box3, Mesh};
+use crate::domain::mesh::{Box3, Lod, Mesh};
 use crate::domain::model::House;
 use crate::use_cases::clutter::clutter_boxes;
 use crate::use_cases::door_panel::door_panels;
 use crate::use_cases::furniture_mesh::furniture_boxes;
+use crate::use_cases::furniture_parts::furniture_boxes_simple;
 use crate::use_cases::lining::add_wall_linings;
 use crate::use_cases::materials::{CEILING, SIDING, WALL, program_material};
 use crate::use_cases::porch::{add_garage_door, add_porch};
 use crate::use_cases::relief::add_exterior_relief;
-use crate::use_cases::roof::add_roof;
+use crate::use_cases::roof::{add_roof, add_roof_with_accessories};
 use crate::use_cases::stairs::stairs_boxes;
 use crate::use_cases::trim::add_trim;
 use crate::use_cases::walls::{STOREY_H, wall_boxes_toned};
@@ -23,6 +24,13 @@ use crate::use_cases::walls::{STOREY_H, wall_boxes_toned};
 pub use crate::use_cases::materials::{ROOF, STAIRS, material_table};
 
 pub fn extrude(house: &House) -> Mesh {
+    extrude_lod(house, Lod::Full)
+}
+
+/// Extrudes `house` at the requested level of detail (`Lod::Full`,
+/// `Lod::Simplified`, or `Lod::Massing`) without mutating or
+/// regenerating the plan.
+pub fn extrude_lod(house: &House, lod: Lod) -> Mesh {
     let mut mesh = Mesh::new(material_table());
     for (fi, floor) in house.floors.iter().enumerate() {
         let base = fi as f32 * STOREY_H;
@@ -36,23 +44,43 @@ pub fn extrude(house: &House) -> Mesh {
         for (b, m) in wall_boxes_toned(floor, base, WALL, SIDING) {
             mesh.add_box(b, m);
         }
-        for (b, m) in furniture_boxes(floor, base)
-            .into_iter()
-            .chain(door_panels(floor, base))
-            .chain(clutter_boxes(floor, base))
-        {
+        match lod {
+            Lod::Full => {
+                for (b, m) in furniture_boxes(floor, base)
+                    .into_iter()
+                    .chain(door_panels(floor, base))
+                    .chain(clutter_boxes(floor, base))
+                {
+                    mesh.add_box(b, m);
+                }
+                add_trim(&mut mesh, floor, base);
+                add_wall_linings(&mut mesh, floor, base);
+                add_exterior_relief(&mut mesh, floor, base);
+            }
+            Lod::Simplified => {
+                for (b, m) in furniture_boxes_simple(floor, base)
+                    .into_iter()
+                    .chain(door_panels(floor, base))
+                {
+                    mesh.add_box(b, m);
+                }
+                add_wall_linings(&mut mesh, floor, base);
+            }
+            Lod::Massing => {}
+        }
+    }
+    if lod != Lod::Massing {
+        for (b, m) in stairs_boxes(house) {
             mesh.add_box(b, m);
         }
-        add_trim(&mut mesh, floor, base);
-        add_wall_linings(&mut mesh, floor, base);
-        add_exterior_relief(&mut mesh, floor, base);
-    }
-    for (b, m) in stairs_boxes(house) {
-        mesh.add_box(b, m);
     }
     add_porch(&mut mesh, house);
     add_garage_door(&mut mesh, house);
-    add_roof(&mut mesh, house);
+    if lod == Lod::Full {
+        add_roof(&mut mesh, house);
+    } else {
+        add_roof_with_accessories(&mut mesh, house, false);
+    }
     mesh
 }
 

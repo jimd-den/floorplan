@@ -96,3 +96,35 @@ pub(crate) fn cabinet_boxes(piece: &Furniture, x: f32, z: f32, w: f32, d: f32, m
     v.push(d1);
     v
 }
+
+/// Simplified single-box bounding representation of each furniture piece on `floor` (for LOD 1).
+pub fn furniture_boxes_simple(floor: &crate::domain::model::Floor, base: f32) -> Vec<(Box3, u32)> {
+    use crate::domain::furniture::FurnitureKind;
+    use crate::use_cases::furniture_mesh::{LAMP_ON, furniture_material};
+    floor
+        .furniture
+        .iter()
+        .map(|p| {
+            let (x, z) = match p.state {
+                FurnitureState::Moved { x, y } => (x as f32, y as f32),
+                _ => (p.rect.x as f32, p.rect.y as f32),
+            };
+            let (w, d) = (p.rect.w as f32, p.rect.d as f32);
+            let h = match p.kind {
+                FurnitureKind::Bed | FurnitureKind::Tub => 0.55,
+                FurnitureKind::Nightstand => 0.50,
+                FurnitureKind::Table | FurnitureKind::Desk => 0.75,
+                FurnitureKind::Chair | FurnitureKind::Sofa => 0.95,
+                FurnitureKind::Lamp => 1.75,
+                FurnitureKind::Sink | FurnitureKind::Counter | FurnitureKind::Cabinet => 0.90,
+                FurnitureKind::Shelf => 1.80,
+            };
+            let m = if p.kind == FurnitureKind::Lamp && p.state == FurnitureState::On {
+                LAMP_ON
+            } else {
+                furniture_material(p.kind)
+            };
+            (Box3::new([x, base, z], [x + w, base + h, z + d]), m)
+        })
+        .collect()
+}

@@ -12,6 +12,8 @@ pub struct Material {
     pub color: [f32; 3],
 }
 
+pub use crate::domain::chunk::Lod;
+
 /// An axis-aligned box: min and max corners, in metres.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Box3 {

@@ -11,6 +11,9 @@ use crate::domain::neighborhood::Neighborhood;
 /// Blocks per chunk. One chunk is one fixed 2x2 neighborhood.
 pub const DEFAULT_CHUNK_BLOCKS: (u32, u32) = (2, 2);
 
+/// World-space spacing between chunk origins, in metres (400 m).
+pub const CHUNK_SPAN: f64 = 400.0;
+
 /// Where a chunk is in its lifecycle. A chunk is generated off the
 /// main path and installed at a metered rate; an evicted chunk is
 /// released and will be rebuilt byte-identically on revisit.
@@ -32,6 +35,31 @@ impl ChunkState {
             ChunkState::Ready => "ready",
             ChunkState::Installed => "installed",
             ChunkState::Evicted => "evicted",
+        }
+    }
+}
+
+/// Per-house level of detail (spec §7):
+/// - `Full` (LOD 0): relief, trim, multi-part furniture, roof accessories.
+/// - `Simplified` (LOD 1): merged trim/relief, single-box furniture, bare roof.
+/// - `Massing` (LOD 2): envelope slabs, walls with openings, bare roof.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Lod {
+    Full,
+    Simplified,
+    Massing,
+}
+
+impl Lod {
+    /// Distance rule (in metres): `< 80 m` -> `Full` (LOD 0),
+    /// `80..=200 m` -> `Simplified` (LOD 1), `> 200 m` -> `Massing` (LOD 2).
+    pub fn for_distance(meters: f64) -> Self {
+        if meters < 80.0 {
+            Lod::Full
+        } else if meters <= 200.0 {
+            Lod::Simplified
+        } else {
+            Lod::Massing
         }
     }
 }
