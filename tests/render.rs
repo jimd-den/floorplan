@@ -112,3 +112,55 @@ fn rendering_the_same_mesh_twice_gives_the_same_pixels() {
 
     assert_eq!(a.pixels, b.pixels);
 }
+
+fn luma_variance(pixels: &[[u8; 3]]) -> f64 {
+    let n = pixels.len() as f64;
+    let lumas: Vec<f64> = pixels
+        .iter()
+        .map(|p| 0.299 * p[0] as f64 + 0.587 * p[1] as f64 + 0.114 * p[2] as f64)
+        .collect();
+    let mean = lumas.iter().sum::<f64>() / n;
+    lumas.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / n
+}
+
+#[test]
+fn rendered_exterior_and_interior_have_pixel_variance_and_visible_shadow() {
+    use floorplan::domain::style::Style;
+    use floorplan::use_cases::extrude::extrude;
+    use floorplan::use_cases::generate::generate_house;
+    use floorplan::use_cases::viewpoint::{View, house_pose};
+
+    let house = generate_house(42, Style::Modern);
+    let mesh = extrude(&house);
+    let vp = Viewport { width: 160, height: 90 };
+
+    for view in [View::Exterior, View::Interior] {
+        let pose = house_pose(&house, view);
+        let cam = Camera::looking_at(pose.eye, pose.target);
+        let img = render(&mesh, &cam, vp);
+        let var = luma_variance(&img.pixels);
+        assert!(var > 150.0, "{view:?} render is flat-shaded (variance {var:.1} <= 150.0)");
+    }
+
+    let start = std::time::Instant::now();
+    for s in 0..20u32 {
+        let _ = generate_house(s, Style::all()[(s % 6) as usize]);
+    }
+    let per_house = start.elapsed() / 20;
+    assert!(per_house.as_millis() <= 25, "house generation took {per_house:?}");
+
+    // Direct test that a single siding wall face has non-zero pixel variance
+    // (visible course shadow lines, never flat-shaded).
+    let mut wall_mesh = Mesh::new(vec![Material { name: "siding", color: [0.72, 0.68, 0.58] }]);
+    add_triangle(&mut wall_mesh, -2.0, 0, false);
+    let wall_img = render(&wall_mesh, &camera(), Viewport { width: 64, height: 48 });
+    let patch: Vec<[u8; 3]> = (18..30)
+        .flat_map(|y| (24..40).map(move |x| (x, y)))
+        .map(|(x, y)| wall_img.pixels[y * 64 + x])
+        .collect();
+    assert!(
+        luma_variance(&patch) > 4.0,
+        "siding wall patch is flat-shaded: variance {:.2}",
+        luma_variance(&patch)
+    );
+}
