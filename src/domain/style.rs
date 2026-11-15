@@ -162,3 +162,27 @@ pub enum PorchKind {
     Optional,
     Wide,
 }
+
+/// Pitched roof form (spec §3, §6): gable, hip, gambrel, or mansard.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum RoofForm {
+    Gable,
+    Hip,
+    Gambrel,
+    Mansard,
+}
+
+impl RoofForm {
+    /// Selects a deterministic roof form biased by `style` and `seed`.
+    pub fn for_house(style: Style, seed: u32) -> Self {
+        let forms: &[RoofForm] = match style {
+            Style::Ranch => &[RoofForm::Gable, RoofForm::Hip],
+            Style::Colonial => &[RoofForm::Gable, RoofForm::Gambrel, RoofForm::Hip],
+            Style::Craftsman => &[RoofForm::Gable, RoofForm::Hip],
+            Style::Modern => &[RoofForm::Gable, RoofForm::Hip],
+            Style::Cottage => &[RoofForm::Gable, RoofForm::Gambrel],
+            Style::Townhouse => &[RoofForm::Gable, RoofForm::Mansard],
+        };
+        forms[(seed as usize / 6) % forms.len()]
+    }
+}

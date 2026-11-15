@@ -34,6 +34,7 @@ pub mod repair;
 pub mod repair_window;
 pub mod retile;
 pub mod roof;
+pub mod roof_detail;
 pub mod scene;
 pub mod stairs;
 pub mod stream;
