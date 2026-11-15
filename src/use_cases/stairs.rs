@@ -1,7 +1,7 @@
 //! Stairs: stepped boxes in the ground hall, rising one storey.
 //!
-//! Solid steps, 0.25 m treads, 1.0 m wide. Empty for one-storey
-//! houses.
+//! Solid steps, 12 to 15 risers (0.18–0.225 m rise), >= 0.20 m
+//! treads, up to 1.0 m wide. Empty for one-storey houses.
 
 use crate::domain::mesh::Box3;
 use crate::domain::model::House;
@@ -17,7 +17,7 @@ pub fn stairs_boxes(house: &House) -> Vec<(Box3, u32)> {
     let horizontal = r.w >= r.d;
     let run = if horizontal { r.w } else { r.d };
     let across = if horizontal { r.d } else { r.w };
-    let steps = ((run / 0.25).floor() as usize).clamp(2, 12);
+    let steps = ((run / 0.25).floor() as usize).clamp(12, 15);
     let rise = STOREY_H / steps as f32;
     let tread = run as f32 / steps as f32;
     let width = (across as f32).min(1.0);

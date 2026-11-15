@@ -128,3 +128,49 @@ fn every_habitable_room_has_a_window_for_200_seeds() {
         }
     }
 }
+
+#[test]
+fn kitchens_and_baths_sit_on_plumbing_walls_and_stairs_have_real_treads() {
+    for seed in 0..100u32 {
+        let style = style_for(seed);
+        let house = generate_house(seed, style);
+        for floor in &house.floors {
+            for (i, room) in floor.rooms.iter().enumerate() {
+                if !matches!(room.program, Program::Kitchen | Program::Bath) {
+                    continue;
+                }
+                let on_ext = room.rect.edges().iter().any(|e| {
+                    let covered: f64 = floor
+                        .rooms
+                        .iter()
+                        .enumerate()
+                        .filter(|(j, _)| *j != i)
+                        .filter_map(|(_, other)| floorplan::domain::geometry::shared_edge(&room.rect, &other.rect))
+                        .filter_map(|s| e.overlap(&s))
+                        .map(|o| o.len())
+                        .sum();
+                    e.len() - covered > 0.1
+                });
+                let shares_wet = floor.rooms.iter().enumerate().any(|(j, other)| {
+                    j != i
+                        && matches!(other.program, Program::Kitchen | Program::Bath | Program::Laundry)
+                        && floorplan::domain::geometry::shared_edge(&room.rect, &other.rect).is_some()
+                });
+                assert!(
+                    on_ext || shares_wet,
+                    "seed {seed} {:?} room {} is not on a plumbing wall",
+                    room.program,
+                    room.id
+                );
+            }
+        }
+        if house.stairs.is_some() {
+            let boxes = floorplan::use_cases::stairs::stairs_boxes(&house);
+            assert!(boxes.len() >= 12, "seed {seed}: stairs have only {} steps", boxes.len());
+            for (b, _) in &boxes {
+                let tread = (b.max[0] - b.min[0]).min(b.max[2] - b.min[2]);
+                assert!(tread >= 0.18, "seed {seed}: stair tread {tread} m too shallow");
+            }
+        }
+    }
+}
