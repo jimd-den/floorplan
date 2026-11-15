@@ -4,18 +4,21 @@
 //! the parts no neighbour shares — with 0.3 m of wall left at each
 //! end. Large rooms get a second window for Modern.
 
-use crate::domain::geometry::{Axis, Segment, shared_edge};
-use crate::domain::model::{Opening, OpeningKind, Room};
+use crate::domain::geometry::{Segment, shared_edge};
+use crate::domain::model::{Opening, Room};
 use crate::domain::style::Style;
 use crate::frameworks_drivers::rng::Rng;
 use crate::use_cases::quant;
+use crate::use_cases::window_clear::place_on_stretch;
 
-/// Places windows for one floor. `next_id` continues the floor's
-/// opening numbering (doors come first).
+/// Places windows for one floor. `doors` are the openings already
+/// placed on the walls; a window never shares wall length with one.
+/// `next_id` continues the floor's opening numbering (doors first).
 pub fn place_windows(
     rng: &mut Rng,
     rooms: &[Room],
     style: Style,
+    doors: &[Opening],
     next_id: &mut u32,
 ) -> Vec<Opening> {
     let spec = style.spec();
@@ -26,8 +29,8 @@ pub fn place_windows(
             continue;
         }
         // Fit the longest stretch, never below a 0.6 m slit.
-        let mut width = quant(rng.range_f64(spec.window.0, spec.window.1));
-        width = width.min((stretches[0].len() - 0.6).max(0.6));
+        let width = quant(rng.range_f64(spec.window.0, spec.window.1))
+            .min((stretches[0].len() - 0.6).max(0.6));
         let mut placed = 0;
         for stretch in stretches.iter() {
             if stretch.len() < width + 0.6 {
@@ -41,7 +44,10 @@ pub fn place_windows(
             if placed == 1 && !second {
                 break;
             }
-            out.push(make_window(rng, room, stretch, width, next_id));
+            let Some(w) = place_on_stretch(rng, room, stretch, width, doors, next_id) else {
+                continue;
+            };
+            out.push(w);
             placed += 1;
             if placed >= 2 {
                 break;
@@ -90,30 +96,6 @@ fn subtract(e: &Segment, cut: &Segment) -> Vec<Segment> {
     out
 }
 
-/// One window centred on a stretch, jittered by the seed.
-fn make_window(
-    rng: &mut Rng,
-    room: &Room,
-    stretch: &Segment,
-    width: f64,
-    next_id: &mut u32,
-) -> Opening {
-    let slack = (stretch.len() - width - 0.6).max(0.0);
-    let offset = if slack > 0.0 {
-        quant(rng.range_f64(-slack / 2.0, slack / 2.0))
-    } else {
-        0.0
-    };
-    let (x, y, axis) = if stretch.is_horizontal() {
-        ((stretch.x1 + stretch.x2) / 2.0 + offset, stretch.y1, Axis::Horizontal)
-    } else {
-        (stretch.x1, (stretch.y1 + stretch.y2) / 2.0 + offset, Axis::Vertical)
-    };
-    let id = *next_id;
-    *next_id += 1;
-    Opening { id, kind: OpeningKind::Window, x, y, axis, width, from: room.id, to: None }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -141,7 +123,7 @@ mod tests {
         let rooms = house_rooms(5);
         let mut rng = Rng::new(5);
         let mut next_id = 0;
-        let windows = place_windows(&mut rng, &rooms, Style::Ranch, &mut next_id);
+        let windows = place_windows(&mut rng, &rooms, Style::Ranch, &[], &mut next_id);
         let got = window_rooms(&windows);
         for room in rooms.iter().filter(|r| r.program.is_habitable()) {
             assert!(got.contains(&room.id), "{:?} room {} has no window", room.program, room.id);
@@ -153,7 +135,7 @@ mod tests {
         let rooms = house_rooms(5);
         let mut rng = Rng::new(5);
         let mut next_id = 0;
-        let windows = place_windows(&mut rng, &rooms, Style::Ranch, &mut next_id);
+        let windows = place_windows(&mut rng, &rooms, Style::Ranch, &[], &mut next_id);
         for w in &windows {
             let room = &rooms[w.from as usize];
             for other in rooms.iter().filter(|r| r.id != room.id) {
@@ -174,7 +156,7 @@ mod tests {
         let rooms = house_rooms(5);
         let mut rng = Rng::new(5);
         let mut next_id = 0;
-        let windows = place_windows(&mut rng, &rooms, Style::Modern, &mut next_id);
+        let windows = place_windows(&mut rng, &rooms, Style::Modern, &[], &mut next_id);
         assert!(!windows.is_empty());
         for w in &windows {
             assert!(w.width >= 1.8, "modern window {} too small", w.width);
@@ -186,7 +168,7 @@ mod tests {
         let rooms = house_rooms(5);
         let mut rng = Rng::new(5);
         let mut next_id = 0;
-        let windows = place_windows(&mut rng, &rooms, Style::Cottage, &mut next_id);
+        let windows = place_windows(&mut rng, &rooms, Style::Cottage, &[], &mut next_id);
         assert!(!windows.is_empty());
         for w in &windows {
             assert!(w.width <= 1.0, "cottage window {} too large", w.width);

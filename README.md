@@ -66,7 +66,10 @@ buffer embedded as base64) — not voxels.
   `> 200 m` Massing — with a 400 m chunk span (`extrude_lod`).
 - **Windows and doors**: four-member window frames with a glass pane,
   two jambs and a head per door, so an opening reads as a window or a
-  door from both sides.
+  door from both sides. Openings never share wall length: a window is
+  sized and centred inside the widest clear stretch of its wall, so it
+  cannot be cut through the entry door or a neighbouring window
+  (`tests/openings.rs`).
 - **Furniture**: every room gets a full set (bed, nightstands, cabinet,
   lamp, chair; sofa, table, shelves, cabinet; counters, table, chairs;
   and so on), placed against walls and cleared of door swings and
@@ -152,7 +155,7 @@ reads the results out of linear memory (protocol v2, see
 JSON payloads are the same text the CLI writers emit; mesh payloads
 are a binary `FPM1` blob (positions, indices, material ids, material
 table). The built module is committed as base64 at
-`wasm/floorplan.wasm.b64` (release, 291,200 bytes) — the binary
+`wasm/floorplan.wasm.b64` (release, 301,898 bytes) — the binary
 itself can't travel through this repo's text-only push path — and
 decodes back with one command:
 

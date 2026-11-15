@@ -78,6 +78,28 @@ pub struct Opening {
     pub to: Option<u32>,
 }
 
+impl Opening {
+    /// True when this opening shares wall length with `other`: same
+    /// axis, same wall line, and intersecting spans. Touching ends do
+    /// not count — two openings may sit side by side.
+    pub fn overlaps(&self, other: &Opening) -> bool {
+        if self.axis != other.axis {
+            return false;
+        }
+        let (line_a, a0, a1) = self.span();
+        let (line_b, b0, b1) = other.span();
+        (line_a - line_b).abs() < 1e-9 && a0 < b1 && b0 < a1
+    }
+    /// The wall line coordinate and the span along it.
+    fn span(&self) -> (f64, f64, f64) {
+        use crate::domain::geometry::Axis;
+        match self.axis {
+            Axis::Horizontal => (self.y, self.x - self.width / 2.0, self.x + self.width / 2.0),
+            Axis::Vertical => (self.x, self.y - self.width / 2.0, self.y + self.width / 2.0),
+        }
+    }
+}
+
 /// One storey of the house.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Floor {
@@ -112,4 +134,38 @@ pub struct House {
     /// The house's light sources and their state (SRD-001 FR-22).
     /// Derived after furnishing, so lamps and rooms exist.
     pub lights: Vec<LightSource>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::geometry::Axis;
+
+    fn opening(id: u32, kind: OpeningKind, x: f64, y: f64, axis: Axis, width: f64) -> Opening {
+        Opening { id, kind, x, y, axis, width, from: 0, to: None }
+    }
+
+    #[test]
+    fn openings_on_the_same_line_overlap_when_their_spans_intersect() {
+        let a = opening(0, OpeningKind::EntryDoor, 3.0, 0.0, Axis::Horizontal, 1.0);
+        let b = opening(1, OpeningKind::Window, 3.5, 0.0, Axis::Horizontal, 1.8);
+        assert!(a.overlaps(&b));
+        assert!(b.overlaps(&a), "overlap is symmetric");
+    }
+
+    #[test]
+    fn openings_that_only_touch_do_not_overlap() {
+        let a = opening(0, OpeningKind::Window, 2.0, 0.0, Axis::Horizontal, 1.0);
+        let b = opening(1, OpeningKind::Window, 3.0, 0.0, Axis::Horizontal, 1.0);
+        assert!(!a.overlaps(&b), "end-to-end openings share only a point");
+    }
+
+    #[test]
+    fn openings_on_different_walls_or_axes_never_overlap() {
+        let a = opening(0, OpeningKind::Window, 2.0, 0.0, Axis::Horizontal, 1.2);
+        let same_span_other_wall = opening(1, OpeningKind::Window, 2.0, 5.0, Axis::Horizontal, 1.2);
+        let crossing = opening(2, OpeningKind::Door, 0.0, 2.0, Axis::Vertical, 0.9);
+        assert!(!a.overlaps(&same_span_other_wall));
+        assert!(!a.overlaps(&crossing));
+    }
 }

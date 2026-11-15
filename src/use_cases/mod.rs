@@ -52,6 +52,7 @@ pub mod upper;
 pub mod variety;
 pub mod viewpoint;
 pub mod walls;
+pub mod window_clear;
 pub mod windows;
 
 /// Quantizes a metre value to 0.1 m. Every seeded dimension in the

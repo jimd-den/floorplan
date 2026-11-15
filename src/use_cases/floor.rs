@@ -113,7 +113,7 @@ pub fn build_floor(
         .unwrap_or(0);
     let mut openings = place_doors(rng, &rooms, &splits, &joins, entry);
     let mut next_id = openings.len() as u32;
-    openings.extend(place_windows(rng, &rooms, style, &mut next_id));
+    openings.extend(place_windows(rng, &rooms, style, &openings, &mut next_id));
     Floor { level, rooms, openings, furniture: vec![], open_doors: vec![] }
 }
 
