@@ -47,12 +47,23 @@ buffer embedded as base64) — not voxels.
 - **Per floor**: a floor slab and a ceiling slab per room.
   **Stairs** for two-storey houses are solid stepped boxes in the
   ground hall.
-- **Roof**: each footprint rectangle gets its own pitched gable at its
+- **Roof**: each footprint rectangle gets its own pitched roof at its
   own storey height — the main body at the top storey, single-storey
-  wings and the garage at one storey — with a 0.4 m eave overhang and
-  the ridge on the rectangle's long axis; gable ends are siding. The
-  top floor keeps an interior ceiling under it. A porch gets its own
-  roof, posts, and steps.
+  wings and the garage at one storey. Four forms per style: **Gable**,
+  **Hip**, **Gambrel**, and **Mansard**, with seed-varied pitch > 0,
+  a 0.4 m eave overhang, fascia/gutter trim, and chimney stacks on the
+  main body. The top floor keeps an interior ceiling under it. A porch
+  gets its own roof, posts, and steps.
+- **Wall relief**: every wall face carries real depth — exterior
+  water-table/belt courses project 2.5 cm past the wall plane, window
+  and door casings protrude, and principal rooms get baseboards, chair
+  rails, and crown moulding. `tests/relief.rs` proves
+  `wall_relief_depth > 0` for every wall segment in every sampled house.
+- **LOD**: `Lod::Full` (relief + multi-part furniture + roof accessories),
+  `Lod::Simplified` (merged trim, single-box furniture, bare roof), and
+  `Lod::Massing` (envelope + openings only). Selected at runtime from the
+  same plan by distance — `< 80 m` Full, `80–200 m` Simplified,
+  `> 200 m` Massing — with a 400 m chunk span (`extrude_lod`).
 - **Windows and doors**: four-member window frames with a glass pane,
   two jambs and a head per door, so an opening reads as a window or a
   door from both sides.
@@ -70,8 +81,8 @@ buffer embedded as base64) — not voxels.
   bedroom, bath, hall, entry, study, laundry, garage) plus
   wall/ceiling/roof/stairs/porch, siding, trim, window frame, glass,
   baseboard, door frame, driveway, trunk, leaf, and clutter.
-- **Budget**: a house stays under 7,000 vertices / 11,000 faces and
-  the 2×2 neighborhood under 90,000 / 140,000, guarded by
+- **Budget**: a house stays under 8,500 vertices / 13,000 faces and
+  the 2×2 neighborhood under 115,000 / 175,000, guarded by
   `tests/mesh_budget.rs`.
 
 ```sh
@@ -141,7 +152,7 @@ reads the results out of linear memory (protocol v2, see
 JSON payloads are the same text the CLI writers emit; mesh payloads
 are a binary `FPM1` blob (positions, indices, material ids, material
 table). The built module is committed as base64 at
-`wasm/floorplan.wasm.b64` (release, 286,772 bytes) — the binary
+`wasm/floorplan.wasm.b64` (release, 291,200 bytes) — the binary
 itself can't travel through this repo's text-only push path — and
 decodes back with one command:
 
@@ -239,12 +250,15 @@ rects. See ADR 0003.
 
 ## Variety
 
-The honest lower bound is **≈ 4.5 × 10⁹ distinct houses** (see
-`docs/reports/variety-count.md` for the counted product). The binding
-cap is the 2³² seed space, still ~4,300× the million-house
-requirement. Program assignment is deterministic and is not counted
-as a factor. Empirically, 1000 seeds give 1000 distinct plan hashes
-(the hash excludes the seed, so that means 1000 distinct plans).
+The conservative combinatorial lower bound is **≈ 5.89 × 10¹² distinct
+houses** (> 10¹²): `6 styles × 861 footprints × 2 room counts × 40 first
+cuts × 12 second cuts × 10 third cuts × 50 door positions × 8 entry
+positions × 27 window widths × 11 window positions`, guarded by
+`tests/variety_bounds.rs`. The binding cap is the 2³² seed space, still
+~430,000× the trillion-house requirement. Program assignment is
+deterministic and is not counted as a factor. Empirically, **10,000
+seeds give 10,000 distinct plan hashes** (the hash excludes the seed, so
+that means 10,000 distinct plans).
 
 ## Running it
 
