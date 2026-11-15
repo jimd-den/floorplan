@@ -22,14 +22,18 @@ pub(crate) fn add_hip(mesh: &mut Mesh, r: Rect, wall_top: f32, pitch: f32) {
         mesh.add_triangle([x0, wall_top, z0], [x0, wall_top, z1], [rx0, ry, rz], ROOF);
         mesh.add_triangle([x1, wall_top, z1], [x1, wall_top, z0], [rx1, ry, rz], ROOF);
     } else {
+        // Ridge along z: vertex order reversed relative to the
+        // branch above, for the same reason as in `add_gable` —
+        // traversed the same way these faces wind inward and a
+        // front-face-only renderer culls the whole roof.
         let inset = (w / 2.0).min(d / 2.0 - 0.1);
         let rx = (x0 + x1) / 2.0;
         let ry = wall_top + (w / 2.0) * pitch;
         let (rz0, rz1) = (z0 + inset, z1 - inset);
-        mesh.add_quad([x0, wall_top, z1], [x0, wall_top, z0], [rx, ry, rz0], [rx, ry, rz1], ROOF);
-        mesh.add_quad([x1, wall_top, z0], [x1, wall_top, z1], [rx, ry, rz1], [rx, ry, rz0], ROOF);
-        mesh.add_triangle([x0, wall_top, z0], [x1, wall_top, z0], [rx, ry, rz0], ROOF);
-        mesh.add_triangle([x1, wall_top, z1], [x0, wall_top, z1], [rx, ry, rz1], ROOF);
+        mesh.add_quad([x0, wall_top, z1], [rx, ry, rz1], [rx, ry, rz0], [x0, wall_top, z0], ROOF);
+        mesh.add_quad([x1, wall_top, z0], [rx, ry, rz0], [rx, ry, rz1], [x1, wall_top, z1], ROOF);
+        mesh.add_triangle([x0, wall_top, z0], [rx, ry, rz0], [x1, wall_top, z0], ROOF);
+        mesh.add_triangle([x1, wall_top, z1], [rx, ry, rz1], [x0, wall_top, z1], ROOF);
     }
 }
 

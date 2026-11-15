@@ -96,12 +96,16 @@ pub(crate) fn add_gable(mesh: &mut Mesh, r: Rect, wall_top: f32, pitch: f32) {
         mesh.add_triangle([x0, wall_top, z0], [x0, wall_top, z1], [x0, ridge_y, ridge_z], SIDING);
         mesh.add_triangle([x1, wall_top, z1], [x1, wall_top, z0], [x1, ridge_y, ridge_z], SIDING);
     } else {
+        // Ridge along z. The vertex order is reversed relative to
+        // the branch above: traversed the same way, these quads and
+        // gables wind inward (normals point down into the house),
+        // and a front-face-only renderer culls the whole roof.
         let ridge_x = (x0 + x1) / 2.0;
         let ridge_y = wall_top + (x1 - x0) / 2.0 * pitch;
-        mesh.add_quad([x0, wall_top, z1], [x0, wall_top, z0], [ridge_x, ridge_y, z0], [ridge_x, ridge_y, z1], ROOF);
-        mesh.add_quad([x1, wall_top, z0], [x1, wall_top, z1], [ridge_x, ridge_y, z1], [ridge_x, ridge_y, z0], ROOF);
-        mesh.add_triangle([x0, wall_top, z0], [x1, wall_top, z0], [ridge_x, ridge_y, z0], SIDING);
-        mesh.add_triangle([x1, wall_top, z1], [x0, wall_top, z1], [ridge_x, ridge_y, z1], SIDING);
+        mesh.add_quad([x0, wall_top, z1], [ridge_x, ridge_y, z1], [ridge_x, ridge_y, z0], [x0, wall_top, z0], ROOF);
+        mesh.add_quad([x1, wall_top, z0], [ridge_x, ridge_y, z0], [ridge_x, ridge_y, z1], [x1, wall_top, z1], ROOF);
+        mesh.add_triangle([x0, wall_top, z0], [ridge_x, ridge_y, z0], [x1, wall_top, z0], SIDING);
+        mesh.add_triangle([x1, wall_top, z1], [ridge_x, ridge_y, z1], [x0, wall_top, z1], SIDING);
     }
 }
 
