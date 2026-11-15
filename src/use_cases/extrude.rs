@@ -14,6 +14,7 @@ use crate::use_cases::furniture_mesh::furniture_boxes;
 use crate::use_cases::lining::add_wall_linings;
 use crate::use_cases::materials::{CEILING, SIDING, WALL, program_material};
 use crate::use_cases::porch::{add_garage_door, add_porch};
+use crate::use_cases::relief::add_exterior_relief;
 use crate::use_cases::roof::add_roof;
 use crate::use_cases::stairs::stairs_boxes;
 use crate::use_cases::trim::add_trim;
@@ -44,6 +45,7 @@ pub fn extrude(house: &House) -> Mesh {
         }
         add_trim(&mut mesh, floor, base);
         add_wall_linings(&mut mesh, floor, base);
+        add_exterior_relief(&mut mesh, floor, base);
     }
     for (b, m) in stairs_boxes(house) {
         mesh.add_box(b, m);

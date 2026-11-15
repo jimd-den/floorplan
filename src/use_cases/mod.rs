@@ -29,6 +29,7 @@ pub mod lining;
 pub mod lots;
 pub mod materials;
 pub mod placement;
+pub mod relief;
 pub mod repair;
 pub mod repair_window;
 pub mod retile;

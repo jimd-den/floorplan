@@ -7,7 +7,7 @@
 
 use crate::domain::geometry::Axis;
 use crate::domain::mesh::{Box3, Mesh};
-use crate::domain::model::{Floor, Opening, OpeningKind};
+use crate::domain::model::{Floor, Opening, OpeningKind, Program};
 use crate::use_cases::materials::{BASEBOARD, DOOR_FRAME, GLASS, WINDOW_FRAME};
 use crate::use_cases::walls::{DOOR_H, WALL_T, WIN_SILL, WIN_TOP};
 
@@ -44,16 +44,16 @@ fn add_window(mesh: &mut Mesh, o: &Opening, base: f32) {
     };
     let members: [Box3; 4] = match o.axis {
         Axis::Horizontal => [
-            Box3::new([lo, sill, y - t / 2.0], [lo + FRAME, top, y + t / 2.0]),
-            Box3::new([hi - FRAME, sill, y - t / 2.0], [hi, top, y + t / 2.0]),
-            Box3::new([lo, sill - FRAME, y - t / 2.0], [hi, sill, y + t / 2.0]),
-            Box3::new([lo, top, y - t / 2.0], [hi, top + FRAME, y + t / 2.0]),
+            Box3::new([lo, sill, y - t / 2.0 - 0.02], [lo + FRAME, top, y + t / 2.0 + 0.02]),
+            Box3::new([hi - FRAME, sill, y - t / 2.0 - 0.02], [hi, top, y + t / 2.0 + 0.02]),
+            Box3::new([lo, sill - FRAME, y - t / 2.0 - 0.03], [hi, sill, y + t / 2.0 + 0.03]),
+            Box3::new([lo, top, y - t / 2.0 - 0.03], [hi, top + FRAME, y + t / 2.0 + 0.03]),
         ],
         Axis::Vertical => [
-            Box3::new([x - t / 2.0, sill, lo], [x + t / 2.0, top, lo + FRAME]),
-            Box3::new([x - t / 2.0, sill, hi - FRAME], [x + t / 2.0, top, hi]),
-            Box3::new([x - t / 2.0, sill - FRAME, lo], [x + t / 2.0, sill, hi]),
-            Box3::new([x - t / 2.0, top, lo], [x + t / 2.0, top + FRAME, hi]),
+            Box3::new([x - t / 2.0 - 0.02, sill, lo], [x + t / 2.0 + 0.02, top, lo + FRAME]),
+            Box3::new([x - t / 2.0 - 0.02, sill, hi - FRAME], [x + t / 2.0 + 0.02, top, hi]),
+            Box3::new([x - t / 2.0 - 0.03, sill - FRAME, lo], [x + t / 2.0 + 0.03, sill, hi]),
+            Box3::new([x - t / 2.0 - 0.03, top, lo], [x + t / 2.0 + 0.03, top + FRAME, hi]),
         ],
     };
     for b in members {
@@ -77,14 +77,14 @@ fn add_door_frame(mesh: &mut Mesh, o: &Opening, base: f32) {
     };
     let members: [Box3; 3] = match o.axis {
         Axis::Horizontal => [
-            Box3::new([lo, base, y - t / 2.0], [lo + FRAME, top, y + t / 2.0]),
-            Box3::new([hi - FRAME, base, y - t / 2.0], [hi, top, y + t / 2.0]),
-            Box3::new([lo, top, y - t / 2.0], [hi, top + FRAME, y + t / 2.0]),
+            Box3::new([lo, base, y - t / 2.0 - 0.02], [lo + FRAME, top, y + t / 2.0 + 0.02]),
+            Box3::new([hi - FRAME, base, y - t / 2.0 - 0.02], [hi, top, y + t / 2.0 + 0.02]),
+            Box3::new([lo - 0.02, top, y - t / 2.0 - 0.02], [hi + 0.02, top + FRAME, y + t / 2.0 + 0.02]),
         ],
         Axis::Vertical => [
-            Box3::new([x - t / 2.0, base, lo], [x + t / 2.0, top, lo + FRAME]),
-            Box3::new([x - t / 2.0, base, hi - FRAME], [x + t / 2.0, top, hi]),
-            Box3::new([x - t / 2.0, top, lo], [x + t / 2.0, top + FRAME, hi]),
+            Box3::new([x - t / 2.0 - 0.02, base, lo], [x + t / 2.0 + 0.02, top, lo + FRAME]),
+            Box3::new([x - t / 2.0 - 0.02, base, hi - FRAME], [x + t / 2.0 + 0.02, top, hi]),
+            Box3::new([x - t / 2.0 - 0.02, top, lo - 0.02], [x + t / 2.0 + 0.02, top + FRAME, hi + 0.02]),
         ],
     };
     for b in members {
@@ -92,20 +92,28 @@ fn add_door_frame(mesh: &mut Mesh, o: &Opening, base: f32) {
     }
 }
 
-/// Four baseboards per room, on the inner face of each wall.
+/// Four baseboards per room, plus chair rail and crown moulding in
+/// the principal rooms (living, dining, entry), on the inner face of
+/// each wall.
 fn add_baseboards(mesh: &mut Mesh, floor: &Floor, base: f32) {
     for room in &floor.rooms {
         let r = room.rect;
         let (x0, z0, x1, z1) = (r.x as f32, r.y as f32, r.right() as f32, r.bottom() as f32);
-        let (a, b) = (base, base + BASE_H);
-        let members = [
-            Box3::new([x0, a, z0 + BASE_IN], [x1, b, z0 + BASE_IN + BASE_T]),
-            Box3::new([x0, a, z1 - BASE_IN - BASE_T], [x1, b, z1 - BASE_IN]),
-            Box3::new([x0 + BASE_IN, a, z0], [x0 + BASE_IN + BASE_T, b, z1]),
-            Box3::new([x1 - BASE_IN - BASE_T, a, z0], [x1 - BASE_IN, b, z1]),
-        ];
-        for b in members {
-            mesh.add_box(b, BASEBOARD);
+        let bands: &[(f32, f32)] = if matches!(room.program, Program::Living | Program::Dining | Program::Entry) {
+            &[(base, base + BASE_H), (base + 0.90, base + 0.94), (base + 2.62, base + 2.68)]
+        } else {
+            &[(base, base + BASE_H)]
+        };
+        for &(a, b) in bands {
+            let members = [
+                Box3::new([x0, a, z0 + BASE_IN], [x1, b, z0 + BASE_IN + BASE_T]),
+                Box3::new([x0, a, z1 - BASE_IN - BASE_T], [x1, b, z1 - BASE_IN]),
+                Box3::new([x0 + BASE_IN, a, z0], [x0 + BASE_IN + BASE_T, b, z1]),
+                Box3::new([x1 - BASE_IN - BASE_T, a, z0], [x1 - BASE_IN, b, z1]),
+            ];
+            for m in members {
+                mesh.add_box(m, BASEBOARD);
+            }
         }
     }
 }
