@@ -8,8 +8,9 @@
 use floorplan::domain::style::Style;
 use floorplan::use_cases::generate::generate_house;
 use floorplan::use_cases::neighborhood::generate_neighborhood;
-use floorplan::use_cases::variety::{
-    house_variety_lower_bound, neighborhood_hash, neighborhood_variety_lower_bound, plan_hash,
+use floorplan::use_cases::variety::{chunk_layout_hash, neighborhood_hash, plan_hash};
+use floorplan::use_cases::variety_bounds::{
+    house_variety_lower_bound, neighborhood_variety_lower_bound,
 };
 
 #[test]
@@ -34,7 +35,30 @@ fn ten_thousand_seeds_give_ten_thousand_distinct_plan_hashes() {
 fn neighborhood_variety_lower_bound_exceeds_millions() {
     let bound = neighborhood_variety_lower_bound();
     assert!(bound >= 1_000_000, "neighborhood bound {bound} < 1,000,000");
-    assert_eq!(bound, 110_824_968);
+    assert_eq!(bound, 3_067_317_007_956_496, "61^8 corner-jitter tuples x 16 edge patterns");
+}
+
+#[test]
+fn twenty_thousand_seeds_give_twenty_thousand_distinct_chunk_layouts() {
+    // The structural tuple behind the bound: four corner nodes and
+    // four edges. Sampled cheaply, because building a whole chunk
+    // (houses included) 20,000 times would take hours.
+    let mut hashes = std::collections::HashSet::with_capacity(20_000);
+    for seed in 0..20_000u32 {
+        hashes.insert(chunk_layout_hash(seed, 0, 0));
+    }
+    assert_eq!(hashes.len(), 20_000, "only {} distinct layouts in 20,000 seeds", hashes.len());
+}
+
+#[test]
+fn one_seed_gives_distinct_layouts_at_twenty_thousand_positions() {
+    // The map is unbounded: a single seed keeps producing new cells
+    // as the window moves.
+    let mut hashes = std::collections::HashSet::with_capacity(20_000);
+    for k in 0..20_000i32 {
+        hashes.insert(chunk_layout_hash(42, k, -k));
+    }
+    assert_eq!(hashes.len(), 20_000, "only {} distinct layouts in 20,000 positions", hashes.len());
 }
 
 #[test]

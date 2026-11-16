@@ -65,19 +65,42 @@ factor of ~4,500.
 plan JSON (`render_plan_json`), so distinct hashes mean distinct
 plans rather than distinct seeds. See `tests/generation.rs`.
 
-## Neighborhoods (curved streets, ADR 0010)
+## Neighborhoods (unbounded lattice, ADR 0011)
 
-The same honesty, for 2 × 2 neighborhoods, from street and lot
-geometry alone — before multiplying by the houses themselves.
-The three layout families are gone, so their factor of 3 is out;
-the spline choices (spine meander, branch count and placement,
-bulb side) add variety on top and are not counted here.
+A chunk is one 140 m lattice cell. Its layout is fixed by the four
+corner nodes and the four cell edges: each node jitters on a 1 m
+grid by `-30..=30` m on each axis, and each edge is kept or dropped.
+The geometry *is* that tuple, so every combination is a distinct
+layout:
 
 ```
-201 block sizes × 41³ lot depths × 2³ lot counts per side
-  = 201 × 41 × 41 × 41 × 8 = 110,824,968
+61 × 61 per node × 4 nodes × 2^4 edge patterns
+  = 61^8 × 16 = 3,067,317,007,956,496
 ```
 
-**≈ 1.1 × 10⁸ distinct neighborhoods**, a floor from the most
-conservative factors alone. See `use_cases/variety.rs`
-(`neighborhood_variety_lower_bound`) and `tests/variety_bounds.rs`.
+**≈ 3.07 × 10¹⁵ distinct chunk layouts**, from the structural
+decisions alone — before lots, houses, lamps, signs, or the density
+tier. The requirement was 1,000,000; the floor clears it by a factor
+of ~3 × 10⁹.
+
+### Measured
+
+`chunk_layout_hash` hashes exactly that tuple (four corner nodes and
+four edges), so it can be sampled cheaply; the full
+`neighborhood_hash` remains the expensive ground truth for a whole
+chunk.
+
+- **Seeds 0..20,000** at chunk (0, 0): **20,000 distinct layouts**
+  (no collision).
+- **Positions (k, -k), k = 0..20,000** at seed 42: **20,000 distinct
+  layouts** — one seed keeps producing new cells as the window moves.
+
+See `tests/variety_bounds.rs` and `use_cases/variety_bounds.rs`.
+
+### The seed cap (a finding, not a limit here)
+
+The generator takes a `u32` seed, so **one cell position** can address
+at most 2³² ≈ 4.3 × 10⁹ layouts. The map is unbounded, so the world's
+layout count has no such cap: a new seed is not required to reach a
+new layout, only a new position. Widening the seed to `u64` would
+raise the per-position cap but is not needed for the requirement.

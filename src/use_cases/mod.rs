@@ -57,6 +57,7 @@ pub mod programs;
 pub mod trim;
 pub mod upper;
 pub mod variety;
+pub mod variety_bounds;
 pub mod viewpoint;
 pub mod walkway;
 pub mod world_lots;

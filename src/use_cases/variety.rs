@@ -1,5 +1,6 @@
-//! Plan and neighborhood variety: pure FNV-1a hashing over the
-//! seed-free domain structures, plus combinatorial variety bounds.
+//! Plan, neighborhood, and chunk variety: pure FNV-1a hashing over
+//! the seed-free domain structures. The combinatorial floors live in
+//! `use_cases::variety_bounds`.
 //!
 //! Nothing here imports `adapters/`: the hashes walk the domain data
 //! directly with zero string allocation (NFR-6). Seeds are excluded on
@@ -107,22 +108,33 @@ pub fn neighborhood_hash(n: &Neighborhood) -> u64 {
     hash
 }
 
-/// Conservative lower bound on distinct houses across the six styles:
-/// 6 styles × 861 footprints × 2 room counts × 40 first cuts × 12 second cuts ×
-/// 10 third cuts × 50 door positions × 8 entry positions × 27 window widths ×
-/// 11 window positions = 5,891,719,680,000 (> 5.89 × 10¹² > 10¹²).
-pub fn house_variety_lower_bound() -> u64 {
-    6 * 861 * 2 * 40 * 12 * 10 * 50 * 8 * 27 * 11
-}
-
-/// Conservative lower bound on distinct 2x2 neighborhoods from street,
-/// lot geometry alone (before multiplying by the ≥ 12 houses):
-/// 201 block sizes × 41³ lot depths × 2³ lot counts per side. The
-/// spline choices (spine meander, branch count and placement, bulb
-/// side) add variety on top and are not counted here; the three
-/// layout families are gone (ADR 0010), so their factor of 3 is out.
-pub fn neighborhood_variety_lower_bound() -> u64 {
-    201 * 41 * 41 * 41 * 8
+/// A cheap structural hash of one chunk: the jittered points of the
+/// cell's four corners and the four cell edges. This is exactly the
+/// tuple the variety bound counts, so it can be sampled tens of
+/// thousands of times; `neighborhood_hash` stays the expensive
+/// ground truth for a whole chunk.
+pub fn chunk_layout_hash(seed: u32, cx: i32, cz: i32) -> u64 {
+    use crate::domain::lattice::{Edge, Node, edge_present, node_point};
+    let mut hash = FNV_OFFSET;
+    for j in 0..=1 {
+        for i in 0..=1 {
+            let p = node_point(seed, Node::new(cx + i, cz + j));
+            hash = feed_f64(hash, p.x);
+            hash = feed_f64(hash, p.y);
+        }
+    }
+    let edges = [
+        Edge::east(Node::new(cx, cz)),
+        Edge::east(Node::new(cx, cz + 1)),
+        Edge::south(Node::new(cx, cz)),
+        Edge::south(Node::new(cx + 1, cz)),
+    ];
+    for edge in edges {
+        hash = feed_u64(hash, edge.a.i as u64);
+        hash = feed_u64(hash, edge.a.j as u64);
+        hash = feed_u64(hash, edge_present(seed, edge) as u64);
+    }
+    hash
 }
 
 #[cfg(test)]
