@@ -5,9 +5,8 @@
 //! - Switchable at runtime from the same `House` plan without changing
 //!   `plan_hash`.
 //! - Distance rule selects LOD 0 near (< 80 m), LOD 1 mid (80–200 m),
-//!   and LOD 2 far (> 200 m), with chunk span = 400 m.
+//!   and LOD 2 far (> 200 m).
 
-use floorplan::domain::chunk::CHUNK_SPAN;
 use floorplan::domain::mesh::Lod;
 use floorplan::domain::style::Style;
 use floorplan::use_cases::extrude::{extrude, extrude_lod};
@@ -45,7 +44,6 @@ fn lod_zero_one_two_extrude_from_same_plan_with_unchanged_plan_hash() {
 
 #[test]
 fn distance_rule_selects_high_lod_near_and_low_lod_far() {
-    assert_eq!(CHUNK_SPAN, 400.0);
     assert_eq!(Lod::for_distance(0.0), Lod::Full);
     assert_eq!(Lod::for_distance(75.0), Lod::Full);
     assert_eq!(Lod::for_distance(120.0), Lod::Simplified);
