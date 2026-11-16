@@ -1,6 +1,6 @@
 //! Level of Detail (LOD) tests (spec §7, §10f):
-//! - LOD 0: full detail (relief, trim, detailed furniture, roof accessories).
-//! - LOD 1: simplified (trim/relief merged, furniture as boxes, bare roof).
+//! - LOD 0: full detail (relief, trim, roof accessories).
+//! - LOD 1: simplified (trim/relief merged, bare roof).
 //! - LOD 2: massing only (envelope, roof, openings).
 //! - Switchable at runtime from the same `House` plan without changing
 //!   `plan_hash`.

@@ -1,5 +1,5 @@
-//! Extrude: House -> Mesh. Slabs, wall boxes with real openings,
-//! stairs, a pitched roof, and trim.
+//! Extrude: House -> Mesh. The foundation slab, wall boxes with
+//! real openings, stairs, a pitched roof, and trim.
 //!
 //! The mesh is the one 3D representation: the OBJ and glTF writers,
 //! the screenshot adapter, and the WASM payload all read it. Walls
@@ -8,12 +8,9 @@
 
 use crate::domain::mesh::{Box3, Lod, Mesh};
 use crate::domain::model::House;
-use crate::use_cases::clutter::clutter_boxes;
 use crate::use_cases::door_panel::door_panels;
-use crate::use_cases::furniture_mesh::furniture_boxes;
-use crate::use_cases::furniture_parts::furniture_boxes_simple;
 use crate::use_cases::lining::add_wall_linings;
-use crate::use_cases::materials::{CEILING, SIDING, WALL, program_material};
+use crate::use_cases::materials::{CEILING, CONCRETE, SIDING, WALL, program_material};
 use crate::use_cases::porch::{add_garage_door, add_porch};
 use crate::use_cases::relief::add_exterior_relief;
 use crate::use_cases::roof::{add_roof, add_roof_with_accessories};
@@ -32,6 +29,18 @@ pub fn extrude(house: &House) -> Mesh {
 /// regenerating the plan.
 pub fn extrude_lod(house: &House, lod: Lod) -> Mesh {
     let mut mesh = Mesh::new(material_table());
+    // The foundation first: one concrete slab box per base rect,
+    // from the slab thickness below floor level up to floor level.
+    // It is part of the envelope, so every LOD carries it.
+    for r in &house.base.rects {
+        mesh.add_box(
+            Box3::new(
+                [r.x as f32, -(house.base.thickness as f32), r.y as f32],
+                [r.right() as f32, 0.0, r.bottom() as f32],
+            ),
+            CONCRETE,
+        );
+    }
     for (fi, floor) in house.floors.iter().enumerate() {
         let base = fi as f32 * STOREY_H;
         for room in &floor.rooms {
@@ -46,11 +55,7 @@ pub fn extrude_lod(house: &House, lod: Lod) -> Mesh {
         }
         match lod {
             Lod::Full => {
-                for (b, m) in furniture_boxes(floor, base)
-                    .into_iter()
-                    .chain(door_panels(floor, base))
-                    .chain(clutter_boxes(floor, base))
-                {
+                for (b, m) in door_panels(floor, base) {
                     mesh.add_box(b, m);
                 }
                 add_trim(&mut mesh, floor, base);
@@ -58,10 +63,7 @@ pub fn extrude_lod(house: &House, lod: Lod) -> Mesh {
                 add_exterior_relief(&mut mesh, floor, base);
             }
             Lod::Simplified => {
-                for (b, m) in furniture_boxes_simple(floor, base)
-                    .into_iter()
-                    .chain(door_panels(floor, base))
-                {
+                for (b, m) in door_panels(floor, base) {
                     mesh.add_box(b, m);
                 }
                 add_wall_linings(&mut mesh, floor, base);
@@ -143,6 +145,25 @@ mod tests {
             .flat_map(|(f, _)| f.iter().map(|&v| mesh.vertices[v as usize][1]))
             .fold(0.0f32, f32::max);
         assert!(roof_top > STOREY_H, "the roof does not rise above the top storey");
+    }
+
+    #[test]
+    fn the_mesh_carries_a_concrete_foundation() {
+        let house = generate_house(42, Style::Modern);
+        let mesh = extrude(&house);
+        assert!(mesh.material_table.iter().any(|m| m.name == "concrete"), "no concrete material");
+        let ys: Vec<f32> = mesh
+            .faces
+            .iter()
+            .zip(mesh.materials.iter())
+            .filter(|(_, m)| **m == CONCRETE)
+            .flat_map(|(f, _)| f.iter().map(|&v| mesh.vertices[v as usize][1]))
+            .collect();
+        assert!(!ys.is_empty(), "no concrete faces");
+        let low = ys.iter().cloned().fold(f32::INFINITY, f32::min);
+        let high = ys.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        assert!((low + 0.3).abs() < 0.01, "the slab does not reach 0.3 m below floor level: {low}");
+        assert!(high.abs() < 0.01, "the slab top is not floor level: {high}");
     }
 
     #[test]

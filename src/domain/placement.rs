@@ -77,18 +77,20 @@ mod tests {
     use crate::domain::style::Style;
 
     fn a_house() -> House {
+        let footprint = Footprint {
+            rects: vec![
+                Rect::new(0.0, 0.0, 12.0, 8.0),
+                Rect::new(0.0, 8.0, 6.0, 3.0),
+            ],
+            joins: vec![Segment::new(0.0, 8.0, 6.0, 8.0)],
+            porch: Some(Rect::new(6.0, 8.0, 4.0, 3.0)),
+            garage: Some(Rect::new(12.0, 2.0, 6.0, 6.0)),
+        };
         House {
             seed: 42,
             style: Style::Colonial,
-            footprint: Footprint {
-                rects: vec![
-                    Rect::new(0.0, 0.0, 12.0, 8.0),
-                    Rect::new(0.0, 8.0, 6.0, 3.0),
-                ],
-                joins: vec![Segment::new(0.0, 8.0, 6.0, 8.0)],
-                porch: Some(Rect::new(6.0, 8.0, 4.0, 3.0)),
-                garage: Some(Rect::new(12.0, 2.0, 6.0, 6.0)),
-            },
+            footprint: footprint.clone(),
+            base: crate::domain::base::Base::from_footprint(&footprint),
             floors: Vec::new(),
             stairs: None,
             lights: Vec::new(),

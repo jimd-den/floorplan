@@ -2,17 +2,35 @@
 //! working light, lamps mirror their furniture, and the porch has a
 //! light when the house has a porch.
 
-use floorplan::domain::furniture::{FurnitureKind, FurnitureState};
+use floorplan::domain::furniture::{Facing, Furniture, FurnitureKind, FurnitureState};
+use floorplan::domain::geometry::Rect;
 use floorplan::domain::interaction::Interaction;
 use floorplan::domain::light::{LightKind, LightSource, LightState};
 use floorplan::domain::model::House;
 use floorplan::domain::style::Style;
 use floorplan::use_cases::generate::generate_house;
 use floorplan::use_cases::interact::apply;
-use floorplan::use_cases::light::toggle;
+use floorplan::use_cases::light::{lights_for_house, toggle};
 
 fn house42() -> House {
     generate_house(42, Style::Modern)
+}
+
+/// A generated house is empty, so a lamp test uses a manual
+/// fixture: a lamp in the first room, with the lights recomputed
+/// so the lamp has its light.
+fn house_with_lamp() -> House {
+    let mut house = house42();
+    let room = house.floors[0].rooms[0].clone();
+    house.floors[0].furniture.push(Furniture::new(
+        1,
+        FurnitureKind::Lamp,
+        room.id,
+        Rect::new(room.rect.x + 0.5, room.rect.y + 0.5, 0.4, 0.4),
+        Facing::North,
+    ));
+    house.lights = lights_for_house(&house);
+    house
 }
 
 fn room_ids(house: &House) -> Vec<u32> {
@@ -67,7 +85,7 @@ fn no_room_is_unwinnably_dark() {
 
 #[test]
 fn a_lamp_light_mirrors_its_furniture() {
-    let house = house42();
+    let house = house_with_lamp();
     let lamps: Vec<_> = house
         .floors
         .iter()
@@ -88,7 +106,7 @@ fn a_lamp_light_mirrors_its_furniture() {
 
 #[test]
 fn toggling_a_lamp_light_updates_the_furniture() {
-    let mut house = house42();
+    let mut house = house_with_lamp();
     let piece = house
         .floors
         .iter()

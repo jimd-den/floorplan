@@ -12,15 +12,20 @@ use crate::domain::geometry::Rect;
 use crate::domain::mesh::{Material, Mesh};
 use crate::domain::placement::placed_point;
 use crate::domain::street_furniture::{LAMP_HEIGHT, LAMP_REACH, RoadSign, StreetLamp};
+use crate::use_cases::materials::CONCRETE;
 
-/// The lamp pole and arm material id, appended after the ground.
-pub const LAMP_MATERIAL: u32 = 42;
+/// The lamp pole and arm material id. The furniture materials sit
+/// after the house table (last id CONCRETE) and the three ground
+/// materials (street, lot, sidewalk), so the lamp is CONCRETE + 4.
+/// Derived, never a literal — appending a house or ground material
+/// shifts these with it.
+pub const LAMP_MATERIAL: u32 = CONCRETE + 4;
 /// The lamp head material id (glass, so the shell can make it glow).
-pub const LAMP_GLASS_MATERIAL: u32 = 43;
+pub const LAMP_GLASS_MATERIAL: u32 = CONCRETE + 5;
 /// The sign post material id.
-pub const SIGN_POST_MATERIAL: u32 = 44;
+pub const SIGN_POST_MATERIAL: u32 = CONCRETE + 6;
 /// The sign plate material id.
-pub const SIGN_FACE_MATERIAL: u32 = 45;
+pub const SIGN_FACE_MATERIAL: u32 = CONCRETE + 7;
 
 /// The four furniture materials, in id order.
 pub fn furniture_materials() -> Vec<Material> {

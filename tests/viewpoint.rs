@@ -50,23 +50,7 @@ fn the_exterior_is_a_three_quarter_view_of_the_centred_footprint() {
 }
 
 #[test]
-fn the_interior_eye_does_not_stand_inside_furniture() {
-    for seed in 0..20u32 {
-        let house = generate_house(seed, Style::Modern);
-        let Pose { eye, .. } = house_pose(&house, View::Interior);
-        for piece in &house.floors[0].furniture {
-            let r = piece.rect;
-            let inside = eye[0] >= r.x as f32 - 0.2
-                && eye[0] <= r.right() as f32 + 0.2
-                && eye[2] >= r.y as f32 - 0.2
-                && eye[2] <= r.bottom() as f32 + 0.2;
-            assert!(!inside, "seed {seed}: eye stands in {:?}", piece.kind);
-        }
-    }
-}
-
-#[test]
-fn the_interior_stands_in_a_furnished_room_not_the_garage() {
+fn the_interior_stands_in_a_room_not_the_garage() {
     for seed in 0..20u32 {
         for style in Style::all() {
             let house = generate_house(seed, style);

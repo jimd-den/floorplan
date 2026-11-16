@@ -1,5 +1,5 @@
-//! One floor: subdivide, assign programs, cap sizes, doors,
-//! windows. `build_floor_retiled` retries the build with one more
+//! One floor: subdivide, assign programs, cap sizes, skeleton,
+//! doors, windows. `build_floor_retiled` retries the build with one more
 //! alcove per round until no room exceeds its program cap — the
 //! re-tiling loop. Each round pins one new rect; the loop is
 //! bounded by the rect count, and exits with the residual when no
@@ -18,6 +18,7 @@ use crate::use_cases::garage::place_garage;
 use crate::use_cases::programs::assign_programs_pinned;
 use crate::use_cases::repair_window::repair_interior_rooms;
 use crate::use_cases::retile::find_retile_target;
+use crate::use_cases::skeleton::build_skeleton;
 use crate::use_cases::windows::place_windows;
 
 /// Builds a floor, re-tiling until no room exceeds its cap.
@@ -111,10 +112,13 @@ pub fn build_floor(
         .or_else(|| rooms.iter().find(|r| r.program == Program::Living))
         .map(|r| r.id)
         .unwrap_or(0);
-    let mut openings = place_doors(rng, &rooms, &splits, &joins, entry);
+    // The skeleton is the floor's circulation structure: walls and
+    // doors are built from it, not from the raw splits.
+    let skeleton = build_skeleton(&rooms, &splits, &joins, entry);
+    let mut openings = place_doors(rng, &rooms, &skeleton, entry);
     let mut next_id = openings.len() as u32;
     openings.extend(place_windows(rng, &rooms, style, &openings, &mut next_id));
-    Floor { level, rooms, openings, furniture: vec![], open_doors: vec![] }
+    Floor { level, rooms, openings, furniture: vec![], open_doors: vec![], skeleton }
 }
 
 /// The upper floor covers the main rect (Colonial) or the whole footprint.
@@ -129,17 +133,6 @@ pub fn upper_rects(fp: &Footprint, style: Style) -> Vec<Rect> {
     } else {
         fp.rects.clone()
     }
-}
-
-/// The hall room id, falling back to living when a floor has no hall.
-pub fn hall_or_living(floor: &Floor) -> u32 {
-    floor
-        .rooms
-        .iter()
-        .find(|r| r.program == Program::Hall)
-        .or_else(|| floor.rooms.iter().find(|r| r.program == Program::Living))
-        .map(|r| r.id)
-        .unwrap_or(0)
 }
 
 #[cfg(test)]

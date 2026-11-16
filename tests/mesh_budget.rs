@@ -13,8 +13,8 @@ use floorplan::use_cases::neighborhood_mesh::neighborhood_mesh;
 /// One house, every style. A house is drawn alone, so it gets the
 /// tighter budget: ~8.5k vertices and ~13k triangles. The M6 realism
 /// pass (pitched roof, siding, frames, baseboards, mouldings, relief,
-/// painted linings) plus a full furniture set spends geometry on
-/// reads-as-a-house; the guard moved with it.
+/// painted linings) spends geometry on reads-as-a-house; the guard
+/// moved with it.
 #[test]
 fn a_house_mesh_fits_the_first_person_budget() {
     for style in Style::all() {

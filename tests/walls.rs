@@ -9,6 +9,7 @@ use floorplan::use_cases::generate::generate_house;
 use floorplan::use_cases::lining::lining_boxes;
 use floorplan::use_cases::materials::{WINDOW_FRAME, material_table};
 use floorplan::use_cases::trim::add_trim;
+use floorplan::domain::skeleton::Skeleton;
 use floorplan::use_cases::walls::{
     DOOR_H, STOREY_H, WIN_SILL, WIN_TOP, openings_on, wall_boxes, wall_boxes_toned,
     wall_segments,
@@ -24,6 +25,10 @@ fn room(id: u32, program: Program, rect: Rect) -> Room {
 
 fn opening(id: u32, kind: OpeningKind, x: f64, y: f64, axis: Axis, width: f64) -> Opening {
     Opening { id, kind, x, y, axis, width, from: 0, to: None }
+}
+
+fn make_floor(rooms: Vec<Room>, openings: Vec<Opening>) -> Floor {
+    Floor { level: 0, rooms, openings, furniture: vec![], open_doors: vec![], skeleton: Skeleton::default() }
 }
 
 #[test]
@@ -96,16 +101,13 @@ fn a_shared_wall_appears_once() {
 
 #[test]
 fn a_door_leaves_a_gap_and_a_lintel() {
-    let floor = Floor {
-        level: 0,
-        rooms: vec![
+    let floor = make_floor(
+        vec![
             room(0, Program::Living, Rect::new(0.0, 0.0, 4.0, 4.0)),
             room(1, Program::Kitchen, Rect::new(4.0, 0.0, 4.0, 4.0)),
         ],
-        openings: vec![opening(0, OpeningKind::Door, 4.0, 2.0, Axis::Vertical, 0.9)],
-        furniture: vec![],
-        open_doors: vec![],
-    };
+        vec![opening(0, OpeningKind::Door, 4.0, 2.0, Axis::Vertical, 0.9)],
+    );
     let boxes = wall_boxes(&floor, 0.0, 0);
     assert!(!boxes.iter().any(|(b, _)| b.contains([4.0, 1.0, 2.0])));
     assert!(boxes.iter().any(|(b, _)| b.contains([4.0, 2.4, 2.0])));
@@ -114,13 +116,10 @@ fn a_door_leaves_a_gap_and_a_lintel() {
 
 #[test]
 fn a_window_leaves_a_gap_a_sill_and_a_lintel() {
-    let floor = Floor {
-        level: 0,
-        rooms: vec![room(0, Program::Living, Rect::new(0.0, 0.0, 4.0, 4.0))],
-        openings: vec![opening(0, OpeningKind::Window, 2.0, 0.0, Axis::Horizontal, 1.2)],
-        furniture: vec![],
-        open_doors: vec![],
-    };
+    let floor = make_floor(
+        vec![room(0, Program::Living, Rect::new(0.0, 0.0, 4.0, 4.0))],
+        vec![opening(0, OpeningKind::Window, 2.0, 0.0, Axis::Horizontal, 1.2)],
+    );
     let boxes = wall_boxes(&floor, 0.0, 0);
     assert!(!boxes.iter().any(|(b, _)| b.contains([2.0, 1.5, 0.0])));
     assert!(boxes.iter().any(|(b, _)| b.contains([2.0, 0.5, 0.0])), "no sill");
@@ -129,13 +128,10 @@ fn a_window_leaves_a_gap_a_sill_and_a_lintel() {
 
 #[test]
 fn a_window_frame_on_a_vertical_wall_stays_at_its_opening() {
-    let floor = Floor {
-        level: 0,
-        rooms: vec![room(0, Program::Living, Rect::new(0.0, 0.0, 4.0, 4.0))],
-        openings: vec![opening(0, OpeningKind::Window, 0.0, 2.0, Axis::Vertical, 1.2)],
-        furniture: vec![],
-        open_doors: vec![],
-    };
+    let floor = make_floor(
+        vec![room(0, Program::Living, Rect::new(0.0, 0.0, 4.0, 4.0))],
+        vec![opening(0, OpeningKind::Window, 0.0, 2.0, Axis::Vertical, 1.2)],
+    );
     let mut mesh = Mesh::new(material_table());
     add_trim(&mut mesh, &floor, 0.0);
 
@@ -156,13 +152,10 @@ fn a_window_frame_on_a_vertical_wall_stays_at_its_opening() {
 
 #[test]
 fn a_lining_covers_the_wall_but_not_a_window() {
-    let floor = Floor {
-        level: 0,
-        rooms: vec![room(0, Program::Living, Rect::new(0.0, 0.0, 4.0, 4.0))],
-        openings: vec![opening(0, OpeningKind::Window, 2.0, 0.0, Axis::Horizontal, 1.2)],
-        furniture: vec![],
-        open_doors: vec![],
-    };
+    let floor = make_floor(
+        vec![room(0, Program::Living, Rect::new(0.0, 0.0, 4.0, 4.0))],
+        vec![opening(0, OpeningKind::Window, 2.0, 0.0, Axis::Horizontal, 1.2)],
+    );
     let boxes = lining_boxes(&floor, 0.0);
     assert!(boxes.iter().any(|b| b.contains([1.0, 1.5, 0.08])), "solid wall unlined");
     assert!(!boxes.iter().any(|b| b.contains([2.0, 1.5, 0.08])), "window covered");
@@ -170,27 +163,18 @@ fn a_lining_covers_the_wall_but_not_a_window() {
 
 #[test]
 fn exterior_walls_get_the_exterior_material() {
-    let floor = Floor {
-        level: 0,
-        rooms: vec![room(0, Program::Living, Rect::new(0.0, 0.0, 4.0, 4.0))],
-        openings: vec![],
-        furniture: vec![],
-        open_doors: vec![],
-    };
+    let floor = make_floor(vec![room(0, Program::Living, Rect::new(0.0, 0.0, 4.0, 4.0))], vec![]);
     let boxes = wall_boxes_toned(&floor, 0.0, 0, 1);
     assert_eq!(boxes.len(), 4, "a single room has four walls");
     assert!(boxes.iter().all(|(_, m)| *m == 1), "a single room has only exterior walls");
 
-    let shared = Floor {
-        level: 0,
-        rooms: vec![
+    let shared = make_floor(
+        vec![
             room(0, Program::Living, Rect::new(0.0, 0.0, 4.0, 4.0)),
             room(1, Program::Kitchen, Rect::new(4.0, 0.0, 4.0, 4.0)),
         ],
-        openings: vec![],
-        furniture: vec![],
-        open_doors: vec![],
-    };
+        vec![],
+    );
     let boxes = wall_boxes_toned(&shared, 0.0, 0, 1);
     assert!(boxes.iter().any(|(_, m)| *m == 0), "the shared wall is interior");
     assert!(boxes.iter().any(|(_, m)| *m == 1), "the perimeter is exterior");

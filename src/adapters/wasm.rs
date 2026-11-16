@@ -8,7 +8,7 @@
 //! - Every payload export returns a pointer to its bytes and
 //!   records the length in `fp_last_len()`; a null pointer means
 //!   the call was refused and the length is 0.
-//! - `fp_version()` returns the protocol version (4).
+//! - `fp_version()` returns the protocol version (5).
 //! - JSON payloads are the same text the CLI writers emit.
 //! - Mesh payloads are the binary format `mesh_bytes` documents.
 //!
@@ -34,14 +34,18 @@ pub use crate::adapters::haunt_json::{
 };
 pub use crate::adapters::mesh_payload::{MESH_MAGIC, mesh_bytes};
 
-/// The protocol version the shell checks against. Version 4 makes the
-/// map unbounded and adds street furniture (ADR 0011): a chunk is a
+/// The protocol version the shell checks against. Version 5 removes
+/// furniture from the house JSON and mesh and adds the base
+/// (ADR 0012): the house JSON carries `base` (foundation rects and
+/// thickness) and no `furniture` array, and the mesh carries concrete
+/// foundation slabs and no furniture boxes. Version 4 made the map
+/// unbounded and added street furniture (ADR 0011): a chunk is a
 /// window onto a lattice, and the neighborhood JSON carries `lamps`
 /// (with their lights) and `signs` (with their plate text). Version 3
 /// replaced the street grid with spline streets (ADR 0010); version 2
 /// added chunk generation by (seed, cx, cz). Every earlier call keeps
 /// its semantics.
-pub const PROTOCOL_VERSION: u32 = 4;
+pub const PROTOCOL_VERSION: u32 = 5;
 
 /// The style index the WASM exports take: `Style::all()` order
 /// (0 Ranch, 1 Colonial, 2 Craftsman, 3 Modern, 4 Cottage,

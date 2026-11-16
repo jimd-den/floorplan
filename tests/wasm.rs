@@ -120,7 +120,7 @@ fn an_invalid_style_index_is_refused() {
 
 #[test]
 fn a_chunk_json_carries_its_own_coordinates_and_neighborhood() {
-    assert_eq!(PROTOCOL_VERSION, 4);
+    assert_eq!(PROTOCOL_VERSION, 5);
     let text = String::from_utf8(chunk_json(42, 0, 0).unwrap()).unwrap();
     assert!(text.contains("\"chunk\":[0,0]"));
     assert!(text.contains("\"streets\":["), "a chunk carries streets");

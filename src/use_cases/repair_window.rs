@@ -21,7 +21,7 @@ fn swap_is_cap_safe(rooms: &[Room], i: usize, j: usize) -> bool {
 /// Pinned room ids are never swapped: the alcove leaf keeps its
 /// program. The swap is cap-safe, so it never creates an over-cap
 /// bath or study. When no cap-safe partner exists, a windowless
-/// Study or Dining is demoted to Laundry — a non-habitable program
+/// habitable room is demoted to Laundry — a non-habitable program
 /// that needs no window — rather than leaving a habitable room blind.
 pub(crate) fn repair_interior_rooms(rooms: &mut [Room], pinned: &[u32]) {
     let rects: Vec<Rect> = rooms.iter().map(|r| r.rect).collect();
@@ -40,7 +40,10 @@ pub(crate) fn repair_interior_rooms(rooms: &mut [Room], pinned: &[u32]) {
                 let (a, b) = (rooms[i].program, rooms[j].program);
                 rooms[i].program = b;
                 rooms[j].program = a;
-            } else if matches!(rooms[i].program, Program::Study | Program::Dining) {
+            } else {
+                // No partner to swap with: demote the room itself
+                // to a program that needs no window. The window
+                // guarantee is the harder rule.
                 rooms[i].program = Program::Laundry;
             }
         }
@@ -73,6 +76,37 @@ pub(crate) fn repair_interior(leaves: &[Rect], out: &mut [Program], pinned: &[us
 #[cfg(test)]
 mod tests {
     use super::*;
+
+#[test]
+fn a_windowless_bedroom_with_no_partner_is_demoted() {
+    // A 3x3 grid of 4x3 leaves: the centre leaf is interior
+    // (windowless). It is a Bedroom; every other leaf is a
+    // Bedroom too, so there is no Bath, Hall or Laundry to swap
+    // with. The window guarantee is the harder rule, so the
+    // bedroom is demoted to Laundry rather than left blind.
+    let leaves = vec![
+        Rect::new(0.0, 0.0, 4.0, 3.0),
+        Rect::new(4.0, 0.0, 4.0, 3.0),
+        Rect::new(8.0, 0.0, 4.0, 3.0),
+        Rect::new(0.0, 3.0, 4.0, 3.0),
+        Rect::new(4.0, 3.0, 4.0, 3.0),
+        Rect::new(8.0, 3.0, 4.0, 3.0),
+        Rect::new(0.0, 6.0, 4.0, 3.0),
+        Rect::new(4.0, 6.0, 4.0, 3.0),
+        Rect::new(8.0, 6.0, 4.0, 3.0),
+    ];
+    let mut rooms: Vec<Room> = leaves
+        .iter()
+        .enumerate()
+        .map(|(i, r)| Room { id: i as u32, program: Program::Bedroom, rect: *r })
+        .collect();
+    repair_interior_rooms(&mut rooms, &[]);
+    assert_eq!(rooms[4].program, Program::Laundry, "the windowless bedroom must be demoted");
+    assert!(
+        rooms.iter().enumerate().all(|(i, r)| i == 4 || r.program == Program::Bedroom),
+        "only the windowless room changes program"
+    );
+}
 
 #[test]
 fn the_repair_never_swaps_a_pinned_leaf() {

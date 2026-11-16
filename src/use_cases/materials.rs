@@ -3,14 +3,15 @@
 //!
 //! The ids are stable. The first five are structural, then ten
 //! programs, then the furniture kinds, then the door; trim and
-//! grounds append after. The renderer reads colours from this table
-//! and the writers read names, so adding a material is a table
-//! change, not a code change.
+//! grounds append after, and concrete (the foundation slab) last.
+//! The furniture kinds keep their slots even though houses no
+//! longer render furniture: the domain still has furniture kinds
+//! (interactions and tasks address them), and dropping the block
+//! would renumber the door and everything after it.
 
 use crate::domain::mesh::Material;
 use crate::domain::model::Program;
 use crate::use_cases::door_panel::door_material;
-use crate::use_cases::furniture_mesh::furniture_materials;
 
 pub const WALL: u32 = 0;
 pub const CEILING: u32 = 1;
@@ -28,6 +29,9 @@ pub const DRIVEWAY: u32 = 35;
 pub const TRUNK: u32 = 36;
 pub const LEAF: u32 = 37;
 pub const CLUTTER: u32 = 38;
+/// The foundation slab material, appended last so every earlier id
+/// is unchanged.
+pub const CONCRETE: u32 = 39;
 
 /// The full material table, in id order.
 pub fn material_table() -> Vec<Material> {
@@ -61,8 +65,30 @@ pub fn material_table() -> Vec<Material> {
         Material { name: "trunk", color: [0.42, 0.30, 0.20] },
         Material { name: "leaf", color: [0.28, 0.48, 0.26] },
         Material { name: "clutter", color: [0.60, 0.45, 0.35] },
+        Material { name: "concrete", color: [0.62, 0.62, 0.60] },
     ]);
     table
+}
+
+/// One material per furniture kind, in `FurnitureKind` order, plus
+/// the bright shade of a lamp that is on. The ids are the furniture
+/// slots (15–27); see the module preamble.
+fn furniture_materials() -> Vec<Material> {
+    vec![
+        Material { name: "bed", color: [0.45, 0.35, 0.65] },
+        Material { name: "nightstand", color: [0.55, 0.40, 0.25] },
+        Material { name: "table", color: [0.60, 0.45, 0.30] },
+        Material { name: "chair", color: [0.50, 0.40, 0.30] },
+        Material { name: "sofa", color: [0.70, 0.30, 0.30] },
+        Material { name: "lamp", color: [0.90, 0.85, 0.60] },
+        Material { name: "desk", color: [0.55, 0.45, 0.30] },
+        Material { name: "tub", color: [0.95, 0.95, 0.95] },
+        Material { name: "sink", color: [0.90, 0.90, 0.95] },
+        Material { name: "shelf", color: [0.65, 0.50, 0.35] },
+        Material { name: "cabinet", color: [0.60, 0.55, 0.45] },
+        Material { name: "counter", color: [0.75, 0.75, 0.75] },
+        Material { name: "lamp_on", color: [1.0, 0.95, 0.55] },
+    ]
 }
 
 /// The material id for a room program, in `material_table` order.
@@ -81,10 +107,11 @@ mod tests {
     #[test]
     fn every_id_has_a_material() {
         let table = material_table();
-        assert_eq!(table.len(), CLUTTER as usize + 1);
+        assert_eq!(table.len(), CONCRETE as usize + 1);
         assert_eq!(table[ROOF as usize].name, "roof");
         assert_eq!(table[SIDING as usize].name, "siding");
         assert_eq!(table[CLUTTER as usize].name, "clutter");
+        assert_eq!(table[CONCRETE as usize].name, "concrete");
     }
 
     #[test]

@@ -75,7 +75,7 @@ fn interior_pose(house: &House) -> Pose {
         rooms = floor.rooms.iter().collect();
     }
     // A garage is the largest room by area but is not a place to stand;
-    // choose the largest furnished living space instead.
+    // choose the largest living space instead.
     let Some(room) = rooms.into_iter().max_by(|a, b| {
         area(a).partial_cmp(&area(b)).unwrap_or(std::cmp::Ordering::Equal)
     }) else {

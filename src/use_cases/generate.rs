@@ -1,18 +1,22 @@
-//! generate_house: the pipeline footprint -> floors -> stairs.
+//! generate_house: the pipeline base -> floors -> stairs -> lights.
 //! Each floor is built by `floor::build_floor_retiled`, which
 //! re-tiles until no room exceeds its program cap.
 
-use crate::domain::model::House;
+use crate::domain::base::Base;
+use crate::domain::model::{Floor, House, Program};
 use crate::domain::style::Style;
 use crate::frameworks_drivers::rng::Rng;
-use crate::use_cases::floor::{build_floor_retiled, hall_or_living, upper_rects};
+use crate::use_cases::floor::{build_floor_retiled, upper_rects};
 use crate::use_cases::footprint::footprint;
 
-/// Builds a whole house from a seed and a style.
+/// Builds a whole house from a seed and a style. Base first: the
+/// foundation slab is laid before any room, and every floor is
+/// built on it.
 pub fn generate_house(seed: u32, style: Style) -> House {
     let mut rng = Rng::new(seed);
     let spec = style.spec();
     let fp = footprint(&mut rng, style);
+    let base = Base::from_footprint(&fp);
     let mut next_room = 0u32;
     let ground = build_floor_retiled(
         &mut rng,
@@ -41,21 +45,29 @@ pub fn generate_house(seed: u32, style: Style) -> House {
         stairs = Some((g_hall, u_hall));
         floors.push(upper);
     }
-    // Furniture is placed after the plan is final, from its own RNG
-    // seeded by the house seed and floor, so the plan's re-tiling is
-    // independent of how many pieces a room can hold.
-    for (i, floor) in floors.iter_mut().enumerate() {
-        let mut furn_rng = Rng::new(seed ^ (i as u32 + 1).wrapping_mul(0x9E37_79B9));
-        floor.furniture = crate::use_cases::furnish::furnish(&mut furn_rng, floor);
-    }
+    // No furnishing step: houses are generated empty, and the rooms
+    // stay traversable. Furniture kinds remain in the domain for
+    // interactions and tasks, which operate on empty lists.
     with_lights(House {
         seed,
         style,
         footprint: fp,
+        base,
         floors,
         stairs,
         lights: Vec::new(),
     })
+}
+
+/// The hall room id, falling back to living when a floor has no hall.
+pub fn hall_or_living(floor: &Floor) -> u32 {
+    floor
+        .rooms
+        .iter()
+        .find(|r| r.program == Program::Hall)
+        .or_else(|| floor.rooms.iter().find(|r| r.program == Program::Living))
+        .map(|r| r.id)
+        .unwrap_or(0)
 }
 
 /// Fills a freshly built house's light sources from its rooms,

@@ -132,7 +132,8 @@ mod tests {
         let mut next_room = 2;
         cap_room_sizes(&mut rooms, &mut splits, &mut next_room);
         let mut rng = Rng::new(3);
-        let doors = place_doors(&mut rng, &rooms, &splits, &[], 0);
+        let skeleton = crate::use_cases::skeleton::build_skeleton(&rooms, &splits, &[], 0);
+        let doors = place_doors(&mut rng, &rooms, &skeleton, 0);
         let remainder = rooms.iter().find(|r| r.id == 2).unwrap().id;
         let bath = rooms.iter().find(|r| r.program == Program::Bath).unwrap().id;
         assert!(

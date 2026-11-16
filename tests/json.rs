@@ -32,10 +32,11 @@ fn json_is_deterministic() {
 }
 
 #[test]
-fn json_lists_furniture_and_open_doors() {
+fn json_carries_the_base_and_no_furniture() {
     let json = render_json(&generate_house(42, Style::Modern));
-    assert!(json.contains("\"furniture\":["), "the house JSON must list furniture");
-    assert!(json.contains("\"kind\":\"bed\""), "a bed should be listed");
+    assert!(json.contains("\"base\":{\"rects\":["), "the house JSON must carry the base");
+    assert!(json.contains("\"thickness\":0.30"), "the base is 0.30 m thick");
+    assert!(!json.contains("furniture"), "the house JSON must not carry furniture");
     assert!(json.contains("\"open_doors\":["), "the house JSON must list open doors");
 }
 

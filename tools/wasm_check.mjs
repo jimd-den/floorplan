@@ -42,7 +42,7 @@ const instance = await WebAssembly.instantiate(mod, {});
 const ex = instance.exports;
 const mem = () => new Uint8Array(ex.memory.buffer);
 
-check('fp_version is 4', ex.fp_version() === 4);
+check('fp_version is 5', ex.fp_version() === 5);
 
 function payload(ptr) {
   const len = ex.fp_last_len();
@@ -92,7 +92,7 @@ for (const seed of SEEDS) {
     const m = parseMesh(p);
     check(`neighborhood mesh magic seed ${seed} ${blocks}`, m.magic === 'FPM1');
     check(
-      `neighborhood mesh ground and furniture names seed ${seed} ${blocks}`,
+      `neighborhood mesh ground and street furniture names seed ${seed} ${blocks}`,
       m.names.slice(-7).join(',') === 'street,lot,sidewalk,lamp_post,lamp_glass,sign_post,sign_face',
     );
     check(`neighborhood json has lamps seed ${seed} ${blocks}`, nb.lamps.length > 0);

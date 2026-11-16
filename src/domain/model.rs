@@ -1,7 +1,9 @@
 //! The plan model: House, Floor, Room, Opening, Style. Pure data, no I/O.
 
+use crate::domain::base::Base;
 use crate::domain::geometry::{Rect, Segment};
 use crate::domain::light::LightSource;
+use crate::domain::skeleton::Skeleton;
 use crate::domain::style::Style;
 
 /// What a room is for.
@@ -110,6 +112,9 @@ pub struct Floor {
     pub furniture: Vec<crate::domain::furniture::Furniture>,
     /// Ids of doors that are open (spec §4.2); all closed by default.
     pub open_doors: Vec<u32>,
+    /// The logical skeleton: the rooms' shared-wall links and the
+    /// entry room. Walls and doors are built from it.
+    pub skeleton: Skeleton,
 }
 
 /// The footprint: the rectangles that tile the house outline, the
@@ -128,6 +133,9 @@ pub struct House {
     pub seed: u32,
     pub style: Style,
     pub footprint: Footprint,
+    /// The foundation slab, built before any room. Its top is floor
+    /// level; the walls and floors sit on it.
+    pub base: Base,
     pub floors: Vec<Floor>,
     /// (ground hall, upper hall) room ids, for two-storey styles.
     pub stairs: Option<(u32, u32)>,

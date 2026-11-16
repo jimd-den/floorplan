@@ -1,7 +1,8 @@
-//! Clearance checks for furniture placement: a candidate rect
-//! must sit inside its room, overlap no placed piece, and block
-//! no door swing and no window. Split out of `furnish` so both
-//! files stay under the 200-line ceiling.
+//! Clearance checks for moving furniture: a candidate rect must
+//! sit inside its room, overlap no placed piece, and block no door
+//! swing and no window. Used by `interact` when a piece is moved;
+//! generation places no furniture, so nothing here is called
+//! while a house is built.
 
 use crate::domain::furniture::{Furniture, FurnitureKind};
 use crate::domain::geometry::{Axis, Rect};
@@ -10,7 +11,7 @@ use crate::domain::model::{Opening, Room};
 /// A candidate rect is valid when it sits inside the room, overlaps
 /// no placed piece, blocks no door swing and no window. Only tall
 /// pieces can block a window; low pieces sit below the sill.
-pub(crate) fn fits(
+pub fn fits(
     room: &Room,
     kind: FurnitureKind,
     rect: &Rect,
@@ -84,116 +85,4 @@ pub fn blocks_window(rect: &Rect, o: &Opening) -> bool {
             on_wall && rect.y < o.y + o.width / 2.0 && rect.bottom() > o.y - o.width / 2.0
         }
     }
-}
-
-/// True when a person can walk from every door of the room into its
-/// main open area. A 0.2 m grid with a 0.15 m body clearance around
-/// each piece; the target is the free space's centroid, not the
-/// geometric centre (a bed can legitimately cover the centre).
-pub fn walkable(room: &Room, doors: &[&Opening], placed: &[Furniture]) -> bool {
-    if doors.is_empty() {
-        return true;
-    }
-    let cell = 0.25;
-    let nx = ((room.rect.w / cell).ceil() as usize).max(1);
-    let nz = ((room.rect.d / cell).ceil() as usize).max(1);
-    let mut blocked = vec![false; nx * nz];
-    let mut sum_i = 0usize;
-    let mut sum_j = 0usize;
-    let mut count = 0usize;
-    for j in 0..nz {
-        let z = room.rect.y + (j as f64 + 0.5) * cell;
-        for i in 0..nx {
-            let x = room.rect.x + (i as f64 + 0.5) * cell;
-            let b = placed.iter().any(|p| {
-                x >= p.rect.x - 0.15
-                    && x <= p.rect.right() + 0.15
-                    && z >= p.rect.y - 0.15
-                    && z <= p.rect.bottom() + 0.15
-            });
-            blocked[j * nx + i] = b;
-            if !b {
-                sum_i += i;
-                sum_j += j;
-                count += 1;
-            }
-        }
-    }
-    if count == 0 {
-        return false;
-    }
-    let (ci, cj) = (sum_i as f64 / count as f64, sum_j as f64 / count as f64);
-    let mut target = (0usize, 0usize);
-    let mut best_d = f64::INFINITY;
-    for j in 0..nz {
-        for i in 0..nx {
-            if !blocked[j * nx + i] {
-                let d = (i as f64 - ci).powi(2) + (j as f64 - cj).powi(2);
-                if d < best_d {
-                    best_d = d;
-                    target = (i, j);
-                }
-            }
-        }
-    }
-    doors.iter().all(|o| {
-        let (dx, dz) = door_inner_point(room, o);
-        let si = ((dx - room.rect.x) / cell).floor() as usize;
-        let sj = ((dz - room.rect.y) / cell).floor() as usize;
-        if si >= nx || sj >= nz {
-            return true;
-        }
-        if blocked[sj * nx + si] {
-            return false;
-        }
-        reachable(&blocked, nx, nz, si, sj, target.0, target.1)
-    })
-}
-
-/// The door's centre, just inside the room.
-fn door_inner_point(room: &Room, o: &Opening) -> (f64, f64) {
-    match o.axis {
-        Axis::Horizontal => {
-            if (o.y - room.rect.y).abs() < 1e-9 {
-                (o.x, o.y + 0.3)
-            } else {
-                (o.x, o.y - 0.3)
-            }
-        }
-        Axis::Vertical => {
-            if (o.x - room.rect.x).abs() < 1e-9 {
-                (o.x + 0.3, o.y)
-            } else {
-                (o.x - 0.3, o.y)
-            }
-        }
-    }
-}
-
-/// Breadth-first reachability on the grid.
-fn reachable(blocked: &[bool], nx: usize, nz: usize, si: usize, sj: usize, ti: usize, tj: usize) -> bool {
-    if blocked[sj * nx + si] {
-        return false;
-    }
-    let mut seen = vec![false; nx * nz];
-    let mut stack = vec![(si, sj)];
-    seen[sj * nx + si] = true;
-    while let Some((i, j)) = stack.pop() {
-        if i == ti && j == tj {
-            return true;
-        }
-        for (di, dj) in [(1i32, 0i32), (-1, 0), (0, 1), (0, -1)] {
-            let ni = i as i32 + di;
-            let nj = j as i32 + dj;
-            if ni < 0 || nj < 0 || ni >= nx as i32 || nj >= nz as i32 {
-                continue;
-            }
-            let (ni, nj) = (ni as usize, nj as usize);
-            if !seen[nj * nx + ni] && !blocked[nj * nx + ni] {
-                seen[nj * nx + ni] = true;
-                stack.push((ni, nj));
-            }
-        }
-    }
-    false
 }

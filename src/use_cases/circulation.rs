@@ -2,15 +2,16 @@
 //! dining where they share a wall but the split tree gave them none.
 
 use crate::domain::model::{Opening, Program, Room};
+use crate::domain::skeleton::SkeletonLink;
 use crate::frameworks_drivers::rng::Rng;
-use crate::use_cases::doors::{Adjacency, make_door};
+use crate::use_cases::doors::make_door;
 
 /// Circulation extras between living / kitchen / dining where they
 /// share a wall but have no door yet — at most two, seeded.
 pub(crate) fn extras(
     rng: &mut Rng,
     rooms: &[Room],
-    adj: &[Adjacency],
+    adj: &[SkeletonLink],
     openings: &[Opening],
     next_id: &mut u32,
 ) -> Vec<Opening> {
@@ -69,7 +70,7 @@ mod tests {
             room(1, Program::Kitchen, Rect::new(4.0, 0.0, 4.0, 4.0)),
             room(2, Program::Dining, Rect::new(4.0, 3.9, 4.0, 4.0)),
         ];
-        let adj = crate::use_cases::doors::adjacency(&rooms);
+        let adj = crate::domain::skeleton::adjacency(&rooms);
         let mut rng = Rng::new(1);
         let mut next_id = 0;
         let extra = extras(&mut rng, &rooms, &adj, &[], &mut next_id);

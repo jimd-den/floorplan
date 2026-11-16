@@ -53,7 +53,24 @@ fn render(house: &House, with_seed: bool) -> String {
     s.push_str(&opt_rect(house.footprint.porch));
     s.push_str(",\"garage\":");
     s.push_str(&opt_rect(house.footprint.garage));
-    s.push_str("},\"floors\":[");
+    s.push('}');
+    // The base is a deterministic function of the footprint, so it
+    // carries no variety: it stays out of the plan JSON and rides
+    // only on the seeded form the shell reads.
+    if with_seed {
+        s.push_str(",\"base\":{\"rects\":[");
+        for (i, r) in house.base.rects.iter().enumerate() {
+            if i > 0 {
+                s.push(',');
+            }
+            s.push_str(&format!(
+                "{{\"x\":{:.2},\"y\":{:.2},\"w\":{:.2},\"d\":{:.2}}}",
+                r.x, r.y, r.w, r.d
+            ));
+        }
+        s.push_str(&format!("],\"thickness\":{:.2}}}", house.base.thickness));
+    }
+    s.push_str(",\"floors\":[");
     for (i, f) in house.floors.iter().enumerate() {
         if i > 0 {
             s.push(',');
@@ -91,24 +108,6 @@ fn render(house: &House, with_seed: bool) -> String {
             ));
         }
         if with_seed {
-            s.push_str("],\"furniture\":[");
-            for (j, p) in f.furniture.iter().enumerate() {
-                if j > 0 {
-                    s.push(',');
-                }
-                s.push_str(&format!(
-                    "{{\"id\":{},\"kind\":\"{}\",\"room\":{},\"x\":{:.2},\"y\":{:.2},\"w\":{:.2},\"d\":{:.2},\"facing\":\"{}\",\"state\":\"{}\"}}",
-                    p.id,
-                    p.kind.name(),
-                    p.room_id,
-                    p.rect.x,
-                    p.rect.y,
-                    p.rect.w,
-                    p.rect.d,
-                    p.facing.name(),
-                    state_name(p.state)
-                ));
-            }
             s.push_str("],\"open_doors\":[");
             for (j, id) in f.open_doors.iter().enumerate() {
                 if j > 0 {
@@ -156,17 +155,5 @@ fn axis_name(axis: Axis) -> &'static str {
     match axis {
         Axis::Horizontal => "horizontal",
         Axis::Vertical => "vertical",
-    }
-}
-
-fn state_name(state: crate::domain::furniture::FurnitureState) -> &'static str {
-    use crate::domain::furniture::FurnitureState;
-    match state {
-        FurnitureState::Fixed => "fixed",
-        FurnitureState::On => "on",
-        FurnitureState::Off => "off",
-        FurnitureState::Open => "open",
-        FurnitureState::Closed => "closed",
-        FurnitureState::Moved { .. } => "moved",
     }
 }
