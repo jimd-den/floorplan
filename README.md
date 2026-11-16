@@ -63,7 +63,7 @@ buffer embedded as base64) — not voxels.
   `Lod::Simplified` (merged trim, single-box furniture, bare roof), and
   `Lod::Massing` (envelope + openings only). Selected at runtime from the
   same plan by distance — `< 80 m` Full, `80–200 m` Simplified,
-  `> 200 m` Massing — with a 400 m chunk span (`extrude_lod`).
+  `> 200 m` Massing (`extrude_lod`).
 - **Windows and doors**: four-member window frames with a glass pane,
   two jambs and a head per door, so an opening reads as a window or a
   door from both sides. Openings never share wall length: a window is
@@ -109,6 +109,21 @@ wide lots get Ranch/Colonial/Modern/Craftsman. Every house fits its lot
 no two houses overlap. The default is 2 × 2 blocks, ~8–13 houses. See
 ADR 0004 and ADR 0010.
 
+Streets also carry furniture, placed from the street alone so every
+window sees the same thing:
+
+- **Lamps** every 22 m, alternating sidewalks, pole in the middle of
+  the sidewalk with its arm reaching 2.4 m over the road and the head
+  at 4.7 m. Each lamp carries a `LightSource` (`LightKind::Lamp`, on,
+  radius 14 m) at its head, so the shell lights the street with the
+  same data it lights a house with. Nothing stands on a turnaround
+  bulb.
+- **Signs**: a stop sign and a street-name plate at each junction
+  approach, on the driver's right and facing the driver; speed-limit
+  signs (15/20/25) every 110 m. A dead end gets no stop sign, and no
+  sign stands on a bulb. The plate's text travels in the JSON
+  (`stop`, `street_name`, `speed_limit`) because a mesh has no font.
+
 ```sh
 floorplan neighborhood --seed 42
 # neighborhood-42.svg (streets, lots, footprints in place, style + seed labels)
@@ -118,36 +133,47 @@ floorplan neighborhood --seed 42 --blocks 3x3 --out nb.svg --json nb.json
 
 ## Streaming (M4)
 
-The neighborhood is unbounded. A **chunk** is one 2 × 2-block
-neighborhood derived only from the world seed and its coordinates
-(`use_cases::chunk`). Chunk (0,0) is the fixed neighborhood above,
-unchanged; other chunks are generated from a seed mixed from the
-world seed and `(cx, cz)` and translated to a 400 m grid.
+The neighborhood is unbounded — there is no edge and no fixed size. The
+world is a **lattice** of nodes at every `(i32, i32)` multiple of 140 m,
+each jittered by the seed up to 30 m on a 1 m grid, with 92% of edges
+kept: a dropped edge turns a crossroads into a T-junction or a curve
+into a cul-de-sac (`domain::lattice`). Every node, edge, and street is a
+pure function of `(seed, node key)`, so two chunks compute the street
+they share byte-identically with no global state and no visit order.
+
+A **chunk** is one lattice cell (`use_cases::chunk`). It keeps the lots
+whose front centre falls in its half-open rectangle — which partitions
+the world's lots exactly once — plus the lamps and signs based there. A
+chunk is a window, not a special origin: move it anywhere in `i32` space
+and new streets keep coming.
 
 `use_cases::stream::Streamer` is a pure lifecycle state machine the
 shell advances once per frame: request the 3 × 3 ring, generate at
 most one chunk, install at most two, evict beyond two chunks away.
 A chunk about to be entered is installed before arrival, and a
 revisit rebuilds byte-identical content. The working set is bounded
-at 25 chunks, so memory plateaus. See ADR 0007.
+at 25 chunks, so memory plateaus. See ADR 0007 and ADR 0011.
 
-The WASM boundary exposes it as protocol v2:
+The WASM boundary exposes it as protocol v4:
 
 ```text
 fp_chunk_json(seed, cx, cz)   chunk JSON: {chunk, state, neighborhood}
 fp_chunk_mesh(seed, cx, cz)   the chunk's FPM1 mesh
 ```
 
-Every v1 export is unchanged. Chunk (0,0) embeds the fixed
-neighborhood's JSON and mesh byte-for-byte.
+Every v1 export is unchanged. Each chunk carries its own streets, lots,
+houses, lamps, and signs; the neighborhood document has the same shape
+everywhere, and the finite `neighborhood` command keeps its own
+`--blocks` grid.
 
 ## WASM
 
 The core compiles to `wasm32-unknown-unknown` with zero crates and
 no wasm-bindgen — a thin adapter (`src/adapters/wasm.rs`) over the
 same generator. The web shell calls raw `extern "C"` exports and
-reads the results out of linear memory (protocol v2, see
-`docs/adr/0004-neighborhood-wasm.md` and `docs/adr/0007-streaming-chunks.md`): `fp_version`,
+reads the results out of linear memory (protocol v4, see
+`docs/adr/0004-neighborhood-wasm.md`, `docs/adr/0007-streaming-chunks.md`,
+and `docs/adr/0011-infinite-lattice-chunks.md`): `fp_version`,
 `fp_alloc`/`fp_free`, `fp_last_len`, `fp_house_json`,
 `fp_neighborhood_json`, `fp_house_mesh`, `fp_neighborhood_mesh`,
 `fp_neighborhood_density_json`, `fp_neighborhood_density_mesh`,
@@ -242,8 +268,11 @@ and the lighting cannot disagree.
   and light relief are complements, and a flicker is offered as a
   dread event, not a render bug (FR-25).
 
-The WASM boundary (protocol v2) exposes `fp_house_lights`,
+The WASM boundary (protocol v4) exposes `fp_house_lights`,
 `fp_house_lights_toggled`, `fp_daylight`, and `fp_light_toggle_state`.
+Street lamps are part of the neighborhood document, so the shell gets
+them from `fp_chunk_json` / `fp_neighborhood_json` with the same light
+shape.
 
 ## Room-size caps
 
@@ -264,6 +293,15 @@ positions × 27 window widths × 11 window positions`, guarded by
 deterministic and is not counted as a factor. Empirically, **10,000
 seeds give 10,000 distinct plan hashes** (the hash excludes the seed, so
 that means 10,000 distinct plans).
+
+For the unbounded map the floor is derived from the lattice: four
+corner nodes with `61 × 61` jitter values each, and four cell edges kept
+or dropped — `61⁸ × 16 = 3,067,317,007,956,496`, **≈ 3.07 × 10¹⁵
+distinct chunk layouts** before lots, houses, lamps, or signs. Measured:
+20,000 seeds at chunk (0,0) give 20,000 distinct layouts, and seed 42
+gives 20,000 distinct layouts across 20,000 positions. The `u32` seed
+caps one cell position at 2³² layouts; the map itself is unbounded, so
+the world's count is not. See `docs/reports/variety-count.md`.
 
 ## Running it
 

@@ -2,9 +2,10 @@
 //
 //   node tools/wasm_check.mjs [--wasm <path>] [--bin <path>]
 //
-// Checks v1 house/neighborhood JSON and FPM1 meshes, v2 streaming chunks,
-// M3 lights/daylight, M5 home-fixing tasks and dread steps, and M1/M6
-// interactive door/lamp mesh updates. Exit code 0 when all pass.
+// Checks v1 house/neighborhood JSON and FPM1 meshes, v2 streaming chunks
+// (now windows onto the unbounded lattice, v4 with street lamps and
+// signs), M3 lights/daylight, M5 home-fixing tasks and dread steps, and
+// M1/M6 interactive door/lamp mesh updates. Exit code 0 when all pass.
 
 import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';

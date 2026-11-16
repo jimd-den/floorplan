@@ -6,6 +6,11 @@ Accepted. Implements SRD-001 §4.1 (FR-1 – FR-9) and the M4 exit
 criteria. Extends ADR 0004's WASM boundary without changing any v1
 call.
 
+The chunk *content* model below — a 2x2-block neighborhood translated
+to a 400 m grid — is superseded by ADR 0011: a chunk is now one lattice
+cell, addressed rather than translated. The lifecycle state machine and
+the streaming budget are unchanged.
+
 ## Context
 
 The neighborhood generator built one finite street network from a
