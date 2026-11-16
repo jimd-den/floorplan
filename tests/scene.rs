@@ -49,8 +49,18 @@ fn the_neighborhood_ground_covers_every_street_and_lot() {
     let (min_z, max_z) = ground.fold((f32::MAX, f32::MIN), |(lo, hi), v| {
         (lo.min(v[2]), hi.max(v[2]))
     });
+    // The ground box spans the neighborhood bounds, so every
+    // street sample and lot outline point must lie inside it.
     for s in &n.streets {
-        assert!(min_x <= s.rect.x as f32 && max_x >= s.rect.right() as f32, "ground short in x");
-        assert!(min_z <= s.rect.y as f32 && max_z >= s.rect.bottom() as f32, "ground short in z");
+        for p in &s.samples.points {
+            assert!(min_x <= p.x as f32 && max_x >= p.x as f32, "ground short in x");
+            assert!(min_z <= p.y as f32 && max_z >= p.y as f32, "ground short in z");
+        }
+    }
+    for lot in &n.lots {
+        for p in &lot.outline {
+            assert!(min_x <= p.x as f32 && max_x >= p.x as f32, "ground short in x");
+            assert!(min_z <= p.y as f32 && max_z >= p.y as f32, "ground short in z");
+        }
     }
 }

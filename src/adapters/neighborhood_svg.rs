@@ -1,11 +1,13 @@
 //! SVG renderer: one neighborhood as one readable SVG document.
 //!
-//! Units are metres (viewBox in metres). Streets are dark bands,
+//! Units are metres (viewBox in metres). Streets are dark ribbons,
 //! lots are pale outlines, each house's footprint is drawn in
 //! place (footprint rectangles + garage, rotated to face its
 //! street) and labelled with style and seed.
 
-use crate::domain::neighborhood::{Neighborhood, house_extent, place_rect};
+use crate::domain::curve::Pt;
+use crate::domain::neighborhood::Neighborhood;
+use crate::domain::placement::{house_corners, house_extent, placed_point};
 
 /// Renders a whole neighborhood as an SVG document.
 pub fn render_neighborhood_svg(n: &Neighborhood) -> String {
@@ -23,40 +25,29 @@ pub fn render_neighborhood_svg(n: &Neighborhood) -> String {
     ));
     s.push_str("<style>text{font-family:sans-serif;font-size:2px;fill:#222} .lot{fill:#f4f1e8;stroke:#999;stroke-width:0.3} .street{fill:#666} .house{fill:#b8c4d4;stroke:#334;stroke-width:0.3} .garage{fill:#9aa4b4;stroke:#334;stroke-width:0.3}</style>\n");
     for street in &n.streets {
-        let r = street.rect;
-        s.push_str(&format!(
-            "<rect class=\"street\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\"/>\n",
-            r.x, r.y, r.w, r.d
-        ));
+        let left = street.samples.offset(4.0);
+        let right = street.samples.offset(-4.0);
+        let mut pts: Vec<Pt> = left;
+        pts.extend(right.iter().rev().copied());
+        s.push_str(&format!("<polygon class=\"street\" points=\"{}\"/>\n", points_attr(&pts)));
     }
     for lot in &n.lots {
-        let r = lot.rect;
-        s.push_str(&format!(
-            "<rect class=\"lot\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\"/>\n",
-            r.x, r.y, r.w, r.d
-        ));
+        s.push_str(&format!("<polygon class=\"lot\" points=\"{}\"/>\n", points_attr(&lot.outline)));
     }
     for h in &n.houses {
         let extent = house_extent(&h.house);
         for r in h.house.footprint.rects.iter() {
-            let q = place_rect(*r, extent, h.rect, h.rotation);
-            s.push_str(&format!(
-                "<rect class=\"house\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\"/>\n",
-                q.x, q.y, q.w, q.d
-            ));
+            let q = quad_for(*r, extent, h);
+            s.push_str(&format!("<polygon class=\"house\" points=\"{}\"/>\n", points_attr(&q)));
         }
         if let Some(g) = h.house.footprint.garage {
-            let q = place_rect(g, extent, h.rect, h.rotation);
-            s.push_str(&format!(
-                "<rect class=\"garage\" x=\"{:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\"/>\n",
-                q.x, q.y, q.w, q.d
-            ));
+            let q = quad_for(g, extent, h);
+            s.push_str(&format!("<polygon class=\"garage\" points=\"{}\"/>\n", points_attr(&q)));
         }
-        let (cx, cy) = h.rect.center();
         s.push_str(&format!(
             "<text x=\"{:.2}\" y=\"{:.2}\" text-anchor=\"middle\">{} #{}</text>\n",
-            cx,
-            cy,
+            h.center.x,
+            h.center.y,
             h.house.style.name(),
             h.house.seed
         ));
@@ -65,13 +56,42 @@ pub fn render_neighborhood_svg(n: &Neighborhood) -> String {
     s
 }
 
-/// The neighborhood's total extent, from its streets.
+/// The four placed corners of a house-local rectangle.
+fn quad_for(r: crate::domain::geometry::Rect, extent: crate::domain::geometry::Rect, h: &crate::domain::neighborhood::PlacedHouse) -> [Pt; 4] {
+    [
+        placed_point(h.center, h.rotation, extent, Pt::new(r.x, r.y)),
+        placed_point(h.center, h.rotation, extent, Pt::new(r.right(), r.y)),
+        placed_point(h.center, h.rotation, extent, Pt::new(r.right(), r.bottom())),
+        placed_point(h.center, h.rotation, extent, Pt::new(r.x, r.bottom())),
+    ]
+}
+
+fn points_attr(pts: &[Pt]) -> String {
+    pts.iter().map(|p| format!("{:.2},{:.2}", p.x, p.y)).collect::<Vec<_>>().join(" ")
+}
+
+/// The neighborhood's total extent, from its streets, lots, and houses.
 fn total_extent(n: &Neighborhood) -> (f64, f64) {
     let mut w = 0.0f64;
     let mut h = 0.0f64;
+    let mut take = |p: Pt| {
+        w = w.max(p.x);
+        h = h.max(p.y);
+    };
     for st in &n.streets {
-        w = w.max(st.rect.right());
-        h = h.max(st.rect.bottom());
+        for p in &st.samples.points {
+            take(*p);
+        }
+    }
+    for lot in &n.lots {
+        for p in &lot.outline {
+            take(*p);
+        }
+    }
+    for house in &n.houses {
+        for p in house_corners(house.center, house.rotation, house_extent(&house.house)) {
+            take(p);
+        }
     }
     (w, h)
 }

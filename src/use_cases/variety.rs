@@ -72,21 +72,36 @@ pub fn plan_hash(house: &House) -> u64 {
 
 /// Hashes a neighborhood (seed-free). Same neighborhood, same hash.
 pub fn neighborhood_hash(n: &Neighborhood) -> u64 {
-    let mut hash = feed_bytes(FNV_OFFSET, n.layout.id().as_bytes());
+    let mut hash = FNV_OFFSET;
     hash = feed_u64(hash, n.blocks.0 as u64);
     hash = feed_u64(hash, n.blocks.1 as u64);
     for s in &n.streets {
-        hash = feed_rect(hash, s.rect);
-        hash = feed_u64(hash, s.horizontal as u64);
+        for c in &s.control {
+            hash = feed_f64(hash, c.x);
+            hash = feed_f64(hash, c.y);
+        }
+        hash = feed_u64(hash, s.bulb_at.is_some() as u64);
+        if let Some(c) = s.bulb_center {
+            hash = feed_f64(hash, c.x);
+            hash = feed_f64(hash, c.y);
+        }
     }
     for l in &n.lots {
-        hash = feed_rect(hash, l.rect);
+        for p in &l.outline {
+            hash = feed_f64(hash, p.x);
+            hash = feed_f64(hash, p.y);
+        }
         hash = feed_u64(hash, l.street as u64);
     }
     for h in &n.houses {
         hash = feed_u64(hash, h.lot as u64);
-        hash = feed_u64(hash, h.rotation as u64);
-        hash = feed_rect(hash, h.rect);
+        hash = feed_f64(hash, h.rotation);
+        hash = feed_f64(hash, h.center.x);
+        hash = feed_f64(hash, h.center.y);
+        for p in &h.walkway {
+            hash = feed_f64(hash, p.x);
+            hash = feed_f64(hash, p.y);
+        }
         hash = feed_house(hash, &h.house);
     }
     hash
@@ -101,10 +116,13 @@ pub fn house_variety_lower_bound() -> u64 {
 }
 
 /// Conservative lower bound on distinct 2x2 neighborhoods from street,
-/// block, and lot geometry alone (before multiplying by the ≥ 12 houses):
-/// 3 layout families × 201 block sizes × 41³ lot depths × 2³ strip counts.
+/// lot geometry alone (before multiplying by the ≥ 12 houses):
+/// 201 block sizes × 41³ lot depths × 2³ lot counts per side. The
+/// spline choices (spine meander, branch count and placement, bulb
+/// side) add variety on top and are not counted here; the three
+/// layout families are gone (ADR 0010), so their factor of 3 is out.
 pub fn neighborhood_variety_lower_bound() -> u64 {
-    3 * 201 * 41 * 41 * 41 * 8
+    201 * 41 * 41 * 41 * 8
 }
 
 #[cfg(test)]

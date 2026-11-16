@@ -34,7 +34,7 @@ fn ten_thousand_seeds_give_ten_thousand_distinct_plan_hashes() {
 fn neighborhood_variety_lower_bound_exceeds_millions() {
     let bound = neighborhood_variety_lower_bound();
     assert!(bound >= 1_000_000, "neighborhood bound {bound} < 1,000,000");
-    assert_eq!(bound, 332_474_904);
+    assert_eq!(bound, 110_824_968);
 }
 
 #[test]

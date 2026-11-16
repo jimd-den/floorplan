@@ -1,172 +1,190 @@
-//! Lot laying: a block becomes lots, each lot gets one house
-//! facing its street. Supports `Low`, `Medium`, and `High`
-//! residential density while guaranteeing every house fits its lot
-//! with setbacks (`FRONT_SETBACK`, `BACK_SETBACK`, `SIDE_SETBACK`).
+//! Lot laying: lots along curved streets (ADR 0010).
+//!
+//! One house per lot, placed to face its street with the
+//! standard setbacks; a lot is kept only when its house fits
+//! inside it, so lots and houses stay in lockstep. A lot that
+//! would overlap one already placed is dropped — the
+//! no-overlap invariant is enforced here, not hoped for. The
+//! lot's shape lives in `lot_geometry`, its walkway in
+//! `walkway`.
 
-use crate::domain::geometry::Rect;
 use crate::domain::layout::Density;
-use crate::domain::neighborhood::{Lot, PlacedHouse, Street, house_extent};
-use crate::domain::style::Style;
+use crate::domain::neighborhood::{Lot, PlacedHouse, Street};
+use crate::domain::polygon::polys_overlap;
 use crate::frameworks_drivers::rng::Rng;
-use crate::use_cases::generate::generate_house;
-use crate::use_cases::layout::BlockPlan;
-use crate::use_cases::neighborhood::{FRONT_SETBACK, SIDE_LOT_D};
-use crate::use_cases::quant;
+use crate::use_cases::lot_geometry::{bulb_outer_side, exclusion_zones, lot_outline, lot_size};
+use crate::use_cases::place_house::place_house;
+use crate::use_cases::street_network::JUNCTION_CLEAR;
 
-/// Lays out one block at `Density::Low`.
-pub fn lay_block(
+/// Lays lots and houses along every street. Lots are laid
+/// street by street; a lot that overlaps one already placed is
+/// dropped with its house, so the returned lots and houses
+/// stay in lockstep and never overlap.
+pub fn lay_lots(
     rng: &mut Rng,
-    lots: &mut Vec<Lot>,
-    houses: &mut Vec<PlacedHouse>,
-    block_rect: Rect,
-    streets: (usize, usize, usize, usize),
-) {
-    lay_block_with_density(rng, lots, houses, block_rect, streets, Density::Low);
-}
-
-/// Lays out one block at the given residential density.
-pub fn lay_block_with_density(
-    rng: &mut Rng,
-    lots: &mut Vec<Lot>,
-    houses: &mut Vec<PlacedHouse>,
-    block_rect: Rect,
-    streets: (usize, usize, usize, usize),
+    streets: &[Street],
     density: Density,
-) {
-    let (north, south, west, east) = streets;
-    let (x0, y0, w, d) = (block_rect.x, block_rect.y, block_rect.w, block_rect.d);
-    let lot_d = match density {
-        Density::Low => quant(rng.range_f64(24.0, 28.0)),
-        Density::Medium => quant(rng.range_f64(24.0, 26.0)),
-        Density::High => 24.0,
-    };
-    let per_side = match density {
-        Density::Low => 1 + rng.range_usize(2),
-        Density::Medium => 3,
-        Density::High => 4 + rng.range_usize(2),
-    };
-    lay_strip(rng, lots, houses, Rect::new(x0, y0, w, lot_d), per_side, 180, north);
-    lay_strip(rng, lots, houses, Rect::new(x0, y0 + d - lot_d, w, lot_d), per_side, 0, south);
-    let mid_top = y0 + lot_d;
-    let mid_h = d - 2.0 * lot_d;
-    if mid_h >= 15.0 {
-        let side_lots = match density {
-            Density::Low => 1,
-            Density::Medium | Density::High => if mid_h >= 30.0 { 2 } else { 1 },
-        };
-        let sub_h = mid_h / side_lots as f64;
-        for k in 0..side_lots {
-            let sy = mid_top + k as f64 * sub_h;
-            let west_lot = Rect::new(x0, sy, SIDE_LOT_D, sub_h);
-            place_house(rng, lots, houses, west_lot, west, 270, true);
-            let east_lot = Rect::new(x0 + w - SIDE_LOT_D, sy, SIDE_LOT_D, sub_h);
-            place_house(rng, lots, houses, east_lot, east, 90, true);
+) -> (Vec<Lot>, Vec<PlacedHouse>) {
+    let mut lots: Vec<Lot> = Vec::new();
+    let mut houses: Vec<PlacedHouse> = Vec::new();
+    for (i, street) in streets.iter().enumerate() {
+        let (sl, sh) = lay_street(rng, street, i, density);
+        for (lot, mut house) in sl.into_iter().zip(sh) {
+            if lots.iter().any(|l| polys_overlap(&lot.outline, &l.outline)) {
+                continue;
+            }
+            house.lot = lots.len();
+            lots.push(lot);
+            houses.push(house);
         }
     }
+    (lots, houses)
 }
 
-/// Lays out a cul-de-sac court block at `Density::Low`.
-pub fn lay_court(
-    rng: &mut Rng,
-    lots: &mut Vec<Lot>,
-    houses: &mut Vec<PlacedHouse>,
-    block_plan: &BlockPlan,
-    streets: &[Street],
-) {
-    lay_court_with_density(rng, lots, houses, block_plan, streets, Density::Low);
-}
-
-/// Lays out a cul-de-sac court block at the given residential density.
-pub fn lay_court_with_density(
-    rng: &mut Rng,
-    lots: &mut Vec<Lot>,
-    houses: &mut Vec<PlacedHouse>,
-    block_plan: &BlockPlan,
-    streets: &[Street],
-    density: Density,
-) {
-    let Some(court) = &block_plan.court else { return };
-    let block = block_plan.rect;
-    let stub = streets[court.stub].rect;
-    let bulb = streets[court.bulb].rect;
-    let stub_idx = court.stub;
-    let bulb_idx = court.bulb;
-    let per_side = match density {
-        Density::Low => 1 + rng.range_usize(2),
-        Density::Medium => 3,
-        Density::High => 4 + rng.range_usize(2),
-    };
-    let north_strip = Rect::new(block.x, block.y, block.w, bulb.y - block.y);
-    lay_strip(rng, lots, houses, north_strip, per_side, 0, bulb_idx);
-    let mid_splits = if density == Density::High && bulb.d >= 26.0 { 2 } else { 1 };
-    let sub_d = bulb.d / mid_splits as f64;
-    for k in 0..mid_splits {
-        let by = bulb.y + k as f64 * sub_d;
-        let west_mid = Rect::new(block.x, by, bulb.x - block.x, sub_d);
-        place_house(rng, lots, houses, west_mid, bulb_idx, 90, true);
-        let east_mid = Rect::new(bulb.right(), by, block.right() - bulb.right(), sub_d);
-        place_house(rng, lots, houses, east_mid, bulb_idx, 270, true);
+/// Lays both sides of one street. Lots along one street are
+/// placed back-to-back, so they cannot overlap each other; the
+/// cross-street check lives in `lay_lots`.
+fn lay_street(rng: &mut Rng, street: &Street, index: usize, density: Density) -> (Vec<Lot>, Vec<PlacedHouse>) {
+    let mut lots = Vec::new();
+    let mut houses = Vec::new();
+    for side in [1i8, -1] {
+        let (mut l, mut h) = lay_side(rng, street, index, density, side);
+        lots.append(&mut l);
+        houses.append(&mut h);
     }
-    let south_west = Rect::new(block.x, bulb.bottom(), stub.x - block.x, block.bottom() - bulb.bottom());
-    place_house(rng, lots, houses, south_west, stub_idx, 90, true);
-    let south_east = Rect::new(stub.right(), bulb.bottom(), block.right() - stub.right(), block.bottom() - bulb.bottom());
-    place_house(rng, lots, houses, south_east, stub_idx, 270, true);
+    (lots, houses)
 }
 
-/// Lays one strip of lots across a rectangle, each facing the street.
-fn lay_strip(
-    rng: &mut Rng,
-    lots: &mut Vec<Lot>,
-    houses: &mut Vec<PlacedHouse>,
-    strip: Rect,
-    per_side: usize,
-    rotation: u16,
-    street: usize,
-) {
-    let lot_w = strip.w / per_side as f64;
-    for k in 0..per_side {
-        let lot = Rect::new(strip.x + k as f64 * lot_w, strip.y, lot_w, strip.d);
-        place_house(rng, lots, houses, lot, street, rotation, false);
+/// Lays lots along one side of one street, from the start of
+/// the street to its end, skipping the junction clearances and
+/// the inner side of any bulb loop.
+fn lay_side(rng: &mut Rng, street: &Street, index: usize, density: Density, side: i8) -> (Vec<Lot>, Vec<PlacedHouse>) {
+    let mut lots = Vec::new();
+    let mut houses = Vec::new();
+    let zones = exclusion_zones(street);
+    let len = street.samples.len();
+    let mut s = JUNCTION_CLEAR;
+    while s < len - JUNCTION_CLEAR {
+        let (frontage, depth) = lot_size(rng, density);
+        // A lot must not straddle the bulb start: the approach
+        // and the loop are different curve regimes, and a lot
+        // spanning the join is a bent wedge that holds no house.
+        if let Some(bulb_at) = street.bulb_at
+            && s < bulb_at && s + frontage > bulb_at {
+            s = bulb_at;
+            continue;
+        }
+        if s + frontage > len - JUNCTION_CLEAR {
+            break;
+        }
+        if let Some(end) = zones.iter().find(|&&(a, b)| s < b && s + frontage > a).map(|&(_, b)| b) {
+            s = end;
+            continue;
+        }
+        let center_s = s + frontage / 2.0;
+        if let Some(bulb_at) = street.bulb_at
+            && center_s > bulb_at && side != bulb_outer_side(street, center_s) {
+            s += frontage;
+            continue;
+        }
+        let lot = Lot {
+            outline: lot_outline(street, s, frontage, depth, side),
+            street: index,
+            center_s,
+            side,
+            frontage,
+            depth,
+        };
+        if let Some(house) = place_house(rng, &lot, street) {
+            lots.push(lot);
+            houses.push(house);
+        }
+        s += frontage;
     }
+    (lots, houses)
 }
 
-/// Generates one house for a lot and places it facing its street.
-fn place_house(
-    rng: &mut Rng,
-    lots: &mut Vec<Lot>,
-    houses: &mut Vec<PlacedHouse>,
-    lot: Rect,
-    street: usize,
-    rotation: u16,
-    small: bool,
-) {
-    let street_span = if matches!(rotation, 0 | 180) { lot.w } else { lot.d };
-    let style = style_for_lot(rng, street_span, small);
-    let house = generate_house(rng.next_u32(), style);
-    let extent = house_extent(&house);
-    let (pw, pd) = match rotation {
-        0 | 180 => (extent.w, extent.d),
-        _ => (extent.d, extent.w),
-    };
-    let (px, py) = match rotation {
-        0 => (lot.x + (lot.w - pw) / 2.0, lot.y + lot.d - FRONT_SETBACK - pd),
-        180 => (lot.x + (lot.w - pw) / 2.0, lot.y + FRONT_SETBACK),
-        90 => (lot.x + lot.w - FRONT_SETBACK - pw, lot.y + (lot.d - pd) / 2.0),
-        _ => (lot.x + FRONT_SETBACK, lot.y + (lot.d - pd) / 2.0),
-    };
-    lots.push(Lot { rect: lot, street });
-    let rect = Rect::new(px, py, pw, pd);
-    houses.push(PlacedHouse { house, lot: lots.len() - 1, rotation, rect });
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::placement::{front_for, house_corners, house_extent, placed_point};
+    use crate::domain::polygon::point_in_poly;
+    use crate::use_cases::neighborhood::WALKWAY_W;
+    use crate::use_cases::street_network::plan_network;
+    use crate::use_cases::walkway::entry_door_point;
 
-/// Narrow lots (< 15 m) get Townhouse; medium/side lots get
-/// Cottage/Townhouse; wide lots get the larger styles.
-fn style_for_lot(rng: &mut Rng, street_span: f64, small: bool) -> Style {
-    if street_span < 15.0 {
-        Style::Townhouse
-    } else if small || street_span < 40.0 {
-        *rng.pick(&[Style::Cottage, Style::Townhouse])
-    } else {
-        *rng.pick(&[Style::Ranch, Style::Colonial, Style::Modern, Style::Craftsman])
+    fn laid(seed: u32) -> (Vec<Lot>, Vec<PlacedHouse>) {
+        let mut rng = Rng::new(seed);
+        let streets = plan_network(&mut rng, (2, 2));
+        lay_lots(&mut rng, &streets, Density::Low)
+    }
+
+    #[test]
+    fn lots_and_houses_stay_in_lockstep() {
+        for seed in 0..20u32 {
+            let (lots, houses) = laid(seed);
+            assert_eq!(lots.len(), houses.len(), "seed {seed}");
+            assert!(!lots.is_empty(), "seed {seed}: no lots");
+            for (i, h) in houses.iter().enumerate() {
+                assert_eq!(h.lot, i, "seed {seed}: house {i} points at lot {}", h.lot);
+            }
+        }
+    }
+
+    #[test]
+    fn no_two_lots_overlap() {
+        for seed in 0..20u32 {
+            let (lots, _) = laid(seed);
+            for i in 0..lots.len() {
+                for j in i + 1..lots.len() {
+                    assert!(!polys_overlap(&lots[i].outline, &lots[j].outline), "seed {seed}: lots {i} and {j} overlap");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn every_house_sits_inside_its_lot() {
+        for seed in 0..20u32 {
+            let (lots, houses) = laid(seed);
+            for h in &houses {
+                let extent = house_extent(&h.house);
+                for c in house_corners(h.center, h.rotation, extent) {
+                    assert!(point_in_poly(c, &lots[h.lot].outline), "seed {seed}: a house corner escapes its lot");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn every_house_faces_its_street() {
+        for seed in 0..20u32 {
+            let mut rng = Rng::new(seed);
+            let streets = plan_network(&mut rng, (2, 2));
+            let (lots, houses) = lay_lots(&mut rng, &streets, Density::Low);
+            for h in &houses {
+                let lot = &lots[h.lot];
+                let street = &streets[lot.street];
+                let outward = street.samples.normal_at(lot.center_s).scale(lot.side as f64);
+                let facing = front_for(h.rotation);
+                let align = facing.dot(outward.scale(-1.0));
+                assert!(align > 0.99, "seed {seed}: house faces away from its street (align {align:.3})");
+            }
+        }
+    }
+
+    #[test]
+    fn every_walkway_reaches_its_door() {
+        for seed in 0..20u32 {
+            let (_, houses) = laid(seed);
+            for h in &houses {
+                let extent = house_extent(&h.house);
+                let door = placed_point(h.center, h.rotation, extent, entry_door_point(&h.house, extent));
+                let (d1, d2) = (h.walkway[2].dist(door), h.walkway[3].dist(door));
+                assert!(d1.min(d2) < 1.2, "seed {seed}: walkway misses its door by {:.2} m", d1.min(d2));
+                let w = h.walkway[0].dist(h.walkway[1]);
+                assert!((w - WALKWAY_W).abs() < 0.01, "seed {seed}: walkway is {w:.2} m wide");
+            }
+        }
     }
 }

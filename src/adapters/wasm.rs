@@ -8,7 +8,7 @@
 //! - Every payload export returns a pointer to its bytes and
 //!   records the length in `fp_last_len()`; a null pointer means
 //!   the call was refused and the length is 0.
-//! - `fp_version()` returns the protocol version (2).
+//! - `fp_version()` returns the protocol version (3).
 //! - JSON payloads are the same text the CLI writers emit.
 //! - Mesh payloads are the binary format `mesh_bytes` documents.
 //!
@@ -34,10 +34,12 @@ pub use crate::adapters::haunt_json::{
 };
 pub use crate::adapters::mesh_payload::{MESH_MAGIC, mesh_bytes};
 
-/// The protocol version the shell checks against. Version 2 adds
-/// chunk generation by (seed, cx, cz) and light/daylight queries;
-/// every version 1 call keeps its semantics.
-pub const PROTOCOL_VERSION: u32 = 2;
+/// The protocol version the shell checks against. Version 3 replaces
+/// the street grid with spline streets (ADR 0010): the neighborhood
+/// JSON carries street control points, lot polygons, and walkway
+/// paths. Version 2 adds chunk generation by (seed, cx, cz) and
+/// light/daylight queries; every version 1 call keeps its semantics.
+pub const PROTOCOL_VERSION: u32 = 3;
 
 /// The style index the WASM exports take: `Style::all()` order
 /// (0 Ranch, 1 Colonial, 2 Craftsman, 3 Modern, 4 Cottage,

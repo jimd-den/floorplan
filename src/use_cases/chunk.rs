@@ -7,7 +7,7 @@
 //! state, so a revisit rebuilds byte-identical content.
 
 use crate::domain::chunk::{Chunk, ChunkState, DEFAULT_CHUNK_BLOCKS};
-use crate::domain::geometry::Rect;
+use crate::domain::curve::{Polyline, Pt};
 use crate::domain::layout::Density;
 use crate::domain::neighborhood::Neighborhood;
 use crate::use_cases::neighborhood::{generate_neighborhood, generate_neighborhood_density};
@@ -60,25 +60,27 @@ pub fn build_chunk(world: u32, cx: i32, cz: i32) -> Chunk {
     }
 }
 
-/// Translates every world-space rectangle in a neighborhood. A zero
+/// Translates every world-space point in a neighborhood. A zero
 /// offset returns the neighborhood untouched, which keeps chunk (0,0)
-/// byte-identical to the fixed neighborhood.
+/// byte-identical to the fixed neighborhood. Arc lengths (`bulb_at`,
+/// `center_s`, `junctions`) are translation-invariant, so they do
+/// not move.
 fn translate(mut n: Neighborhood, dx: f64, dz: f64) -> Neighborhood {
     if dx == 0.0 && dz == 0.0 {
         return n;
     }
+    let shift = |p: Pt| Pt::new(p.x + dx, p.y + dz);
     for street in &mut n.streets {
-        street.rect = shift(street.rect, dx, dz);
+        street.control = street.control.iter().map(|&p| shift(p)).collect();
+        street.samples = Polyline::new(street.samples.points.iter().map(|&p| shift(p)).collect());
+        street.bulb_center = street.bulb_center.map(shift);
     }
     for lot in &mut n.lots {
-        lot.rect = shift(lot.rect, dx, dz);
+        lot.outline = lot.outline.iter().map(|&p| shift(p)).collect();
     }
     for house in &mut n.houses {
-        house.rect = shift(house.rect, dx, dz);
+        house.center = shift(house.center);
+        house.walkway = house.walkway.map(shift);
     }
     n
-}
-
-fn shift(rect: Rect, dx: f64, dz: f64) -> Rect {
-    Rect::new(rect.x + dx, rect.y + dz, rect.w, rect.d)
 }

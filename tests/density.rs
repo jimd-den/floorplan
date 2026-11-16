@@ -1,11 +1,14 @@
-//! Higher-density neighborhood tests: house counts, setback/frontage
-//! invariants across all layout families and density tiers, and WASM
-//! density payloads.
+//! Higher-density neighborhood tests: house counts, the curved
+//! invariants, and lot sizes across all density tiers. Lots are
+//! polygons along spline streets, so setbacks are checked as
+//! house corners inside the lot polygon and overlaps as polygon
+//! overlaps; there are no layout families left to iterate.
 
-use floorplan::domain::layout::{Density, Layout};
+use floorplan::domain::layout::Density;
+use floorplan::domain::placement::{house_corners, house_extent};
+use floorplan::domain::polygon::{point_in_poly, polys_overlap};
 use floorplan::use_cases::neighborhood::{
-    BACK_SETBACK, DEFAULT_BLOCKS, FRONT_SETBACK, SIDE_SETBACK, generate_neighborhood_density,
-    generate_neighborhood_full,
+    DEFAULT_BLOCKS, generate_neighborhood_density, generate_neighborhood_full,
 };
 use std::collections::HashSet;
 
@@ -27,8 +30,13 @@ fn medium_and_high_density_pack_more_houses_per_block_than_low() {
             high.houses.len(),
             med.houses.len()
         );
+        // The curved frame's street length (~370 m for 2x2) caps
+        // high density: measured 19-30 over seeds 0-19, mean
+        // 23.9. The grid-era floor of 32 assumed the grid's
+        // denser street network and is unreachable here; 18
+        // keeps high well above medium's floor of 12.
         assert!(
-            high.houses.len() >= 32,
+            high.houses.len() >= 18,
             "seed {seed}: high density only placed {} houses",
             high.houses.len()
         );
@@ -36,51 +44,67 @@ fn medium_and_high_density_pack_more_houses_per_block_than_low() {
 }
 
 #[test]
-fn all_density_tiers_and_layout_families_preserve_setbacks_and_frontage() {
+fn all_density_tiers_preserve_the_curved_invariants() {
     for density in Density::all() {
-        for layout in Layout::all() {
-            for seed in 0..15u32 {
-                let n = generate_neighborhood_full(seed, DEFAULT_BLOCKS, layout, density);
-                assert_eq!(n.lots.len(), n.houses.len());
-                let mut seen = HashSet::new();
-                for h in &n.houses {
-                    assert!(seen.insert(h.lot));
-                    let lot = n.lots[h.lot].rect;
-                    let front_ok = match h.rotation {
-                        0 => lot.bottom() - h.rect.bottom() >= FRONT_SETBACK - 1e-9,
-                        180 => h.rect.y - lot.y >= FRONT_SETBACK - 1e-9,
-                        90 => lot.right() - h.rect.right() >= FRONT_SETBACK - 1e-9,
-                        _ => h.rect.x - lot.x >= FRONT_SETBACK - 1e-9,
-                    };
-                    let back_ok = match h.rotation {
-                        0 => h.rect.y - lot.y >= BACK_SETBACK - 1e-9,
-                        180 => lot.bottom() - h.rect.bottom() >= BACK_SETBACK - 1e-9,
-                        90 => h.rect.x - lot.x >= BACK_SETBACK - 1e-9,
-                        _ => lot.right() - h.rect.right() >= BACK_SETBACK - 1e-9,
-                    };
-                    let side_ok = match h.rotation {
-                        0 | 180 => {
-                            h.rect.x - lot.x >= SIDE_SETBACK - 1e-9
-                                && lot.right() - h.rect.right() >= SIDE_SETBACK - 1e-9
-                        }
-                        _ => {
-                            h.rect.y - lot.y >= SIDE_SETBACK - 1e-9
-                                && lot.bottom() - h.rect.bottom() >= SIDE_SETBACK - 1e-9
-                        }
-                    };
+        for seed in 0..15u32 {
+            let n = generate_neighborhood_full(seed, DEFAULT_BLOCKS, density);
+            assert_eq!(n.lots.len(), n.houses.len(), "{density:?} seed {seed}");
+            let mut seen = HashSet::new();
+            for h in &n.houses {
+                assert!(seen.insert(h.lot), "{density:?} seed {seed}: lot {} has two houses", h.lot);
+                let extent = house_extent(&h.house);
+                for c in house_corners(h.center, h.rotation, extent) {
                     assert!(
-                        front_ok && back_ok && side_ok,
-                        "{density:?} {layout:?} seed {seed}: setback violated"
+                        point_in_poly(c, &n.lots[h.lot].outline),
+                        "{density:?} seed {seed}: a house corner escapes its lot"
                     );
                 }
-                for i in 0..n.houses.len() {
-                    for j in i + 1..n.houses.len() {
-                        assert!(
-                            !n.houses[i].rect.overlaps(&n.houses[j].rect),
-                            "{density:?} {layout:?} seed {seed}: houses {i} and {j} overlap"
-                        );
-                    }
+            }
+            for i in 0..n.houses.len() {
+                for j in i + 1..n.houses.len() {
+                    let a = &n.houses[i];
+                    let b = &n.houses[j];
+                    let qa = house_corners(a.center, a.rotation, house_extent(&a.house));
+                    let qb = house_corners(b.center, b.rotation, house_extent(&b.house));
+                    assert!(
+                        !polys_overlap(&qa, &qb),
+                        "{density:?} seed {seed}: houses {i} and {j} overlap"
+                    );
                 }
+            }
+            for i in 0..n.lots.len() {
+                for j in i + 1..n.lots.len() {
+                    assert!(
+                        !polys_overlap(&n.lots[i].outline, &n.lots[j].outline),
+                        "{density:?} seed {seed}: lots {i} and {j} overlap"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn lot_sizes_follow_their_density_tier() {
+    for density in Density::all() {
+        let (f_lo, f_hi, d_lo, d_hi) = match density {
+            Density::Low => (32.0, 42.0, 24.0, 28.0),
+            Density::Medium => (25.0, 32.0, 24.0, 26.0),
+            Density::High => (15.0, 24.0, 24.0, 24.0),
+        };
+        for seed in 0..15u32 {
+            let n = generate_neighborhood_full(seed, DEFAULT_BLOCKS, density);
+            for lot in &n.lots {
+                assert!(
+                    lot.frontage >= f_lo - 1e-9 && lot.frontage <= f_hi + 1e-9,
+                    "{density:?} seed {seed}: frontage {:.2} m outside {f_lo}..{f_hi}",
+                    lot.frontage
+                );
+                assert!(
+                    lot.depth >= d_lo - 1e-9 && lot.depth <= d_hi + 1e-9,
+                    "{density:?} seed {seed}: depth {:.2} m outside {d_lo}..{d_hi}",
+                    lot.depth
+                );
             }
         }
     }

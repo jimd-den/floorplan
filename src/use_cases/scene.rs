@@ -6,10 +6,12 @@
 //! box underneath it. The ground top sits below every slab and lot, so
 //! nothing z-fights and no building floats.
 
+use crate::domain::curve::Pt;
 use crate::domain::geometry::Rect;
 use crate::domain::mesh::{Box3, Material, Mesh};
 use crate::domain::model::House;
-use crate::domain::neighborhood::{Neighborhood, house_extent};
+use crate::domain::neighborhood::Neighborhood;
+use crate::domain::placement::{house_corners, house_extent};
 use crate::use_cases::extrude::extrude;
 use crate::use_cases::neighborhood_mesh::neighborhood_mesh;
 
@@ -53,20 +55,30 @@ fn add_ground(mesh: &mut Mesh, r: Rect) {
     );
 }
 
-/// Every street, lot, and house rect, padded so the plain reaches past
-/// the last building.
+/// Every street sample, lot corner, and house corner, padded so
+/// the plain reaches past the last building.
 fn bounds(n: &Neighborhood) -> Rect {
-    let mut rects: Vec<Rect> = n.streets.iter().map(|s| s.rect).collect();
-    rects.extend(n.lots.iter().map(|l| l.rect));
-    rects.extend(n.houses.iter().map(|h| h.rect));
-    let (mut min_x, mut min_y) = (f64::MAX, f64::MAX);
-    let (mut max_x, mut max_y) = (f64::MIN, f64::MIN);
-    for r in rects {
-        min_x = min_x.min(r.x);
-        min_y = min_y.min(r.y);
-        max_x = max_x.max(r.right());
-        max_y = max_y.max(r.bottom());
+    let mut pts: Vec<Pt> = Vec::new();
+    for s in &n.streets {
+        pts.extend(s.samples.points.iter().copied());
+    }
+    for l in &n.lots {
+        pts.extend(l.outline.iter().copied());
+    }
+    for h in &n.houses {
+        pts.extend(house_corners(h.center, h.rotation, house_extent(&h.house)));
     }
     let pad = 1500.0;
+    if pts.is_empty() {
+        return Rect::new(-pad, -pad, 2.0 * pad, 2.0 * pad);
+    }
+    let (mut min_x, mut min_y) = (f64::MAX, f64::MAX);
+    let (mut max_x, mut max_y) = (f64::MIN, f64::MIN);
+    for p in pts {
+        min_x = min_x.min(p.x);
+        min_y = min_y.min(p.y);
+        max_x = max_x.max(p.x);
+        max_y = max_y.max(p.y);
+    }
     Rect::new(min_x - pad, min_y - pad, max_x - min_x + 2.0 * pad, max_y - min_y + 2.0 * pad)
 }

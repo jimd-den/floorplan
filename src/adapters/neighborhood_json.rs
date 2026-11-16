@@ -3,9 +3,12 @@
 //! Fixed field order, two-decimal floats, no whitespace — the same
 //! neighborhood always renders byte-identical JSON. Each house
 //! carries its plan (seed-free), so the document is complete and
-//! the variety hash can be taken over it.
+//! the variety hash can be taken over it. Protocol v3 (ADR 0010):
+//! streets are spline control points, lots are polygons, houses
+//! carry their centre, rotation, and walkway path.
 
 use crate::adapters::json::render_plan_json;
+use crate::domain::curve::Pt;
 use crate::domain::neighborhood::Neighborhood;
 
 /// Renders a whole neighborhood as a single-line JSON document.
@@ -20,33 +23,35 @@ pub fn render_neighborhood_plan_json(n: &Neighborhood) -> String {
     render(n, false)
 }
 
+fn points(pts: &[Pt]) -> String {
+    let mut s = String::from("[");
+    for (i, p) in pts.iter().enumerate() {
+        if i > 0 {
+            s.push(',');
+        }
+        s.push_str(&format!("[{:.2},{:.2}]", p.x, p.y));
+    }
+    s.push(']');
+    s
+}
+
 fn render(n: &Neighborhood, with_seed: bool) -> String {
     let mut s = String::new();
     if with_seed {
-        s.push_str(&format!(
-            "{{\"seed\":{},\"layout\":\"{}\",\"blocks\":[{},{}],",
-            n.seed,
-            n.layout.id(),
-            n.blocks.0,
-            n.blocks.1
-        ));
+        s.push_str(&format!("{{\"seed\":{},\"blocks\":[{},{}],", n.seed, n.blocks.0, n.blocks.1));
     } else {
-        s.push_str(&format!(
-            "{{\"layout\":\"{}\",\"blocks\":[{},{}],",
-            n.layout.id(),
-            n.blocks.0,
-            n.blocks.1
-        ));
+        s.push_str(&format!("{{\"blocks\":[{},{}],", n.blocks.0, n.blocks.1));
     }
     s.push_str("\"streets\":[");
     for (i, st) in n.streets.iter().enumerate() {
         if i > 0 {
             s.push(',');
         }
-        s.push_str(&format!(
-            "{{\"x\":{:.2},\"y\":{:.2},\"w\":{:.2},\"d\":{:.2},\"horizontal\":{}}}",
-            st.rect.x, st.rect.y, st.rect.w, st.rect.d, st.horizontal
-        ));
+        s.push_str(&format!("{{\"control\":{},\"bulb\":{}", points(&st.control), st.bulb_at.is_some()));
+        if let Some(c) = st.bulb_center {
+            s.push_str(&format!(",\"bulb_center\":[{:.2},{:.2}]", c.x, c.y));
+        }
+        s.push('}');
     }
     s.push_str("],\"lots\":[");
     for (i, lot) in n.lots.iter().enumerate() {
@@ -54,8 +59,11 @@ fn render(n: &Neighborhood, with_seed: bool) -> String {
             s.push(',');
         }
         s.push_str(&format!(
-            "{{\"x\":{:.2},\"y\":{:.2},\"w\":{:.2},\"d\":{:.2},\"street\":{}}}",
-            lot.rect.x, lot.rect.y, lot.rect.w, lot.rect.d, lot.street
+            "{{\"points\":{},\"street\":{},\"center_s\":{:.2},\"side\":{}}}",
+            points(&lot.outline),
+            lot.street,
+            lot.center_s,
+            lot.side
         ));
     }
     s.push_str("],\"houses\":[");
@@ -64,8 +72,8 @@ fn render(n: &Neighborhood, with_seed: bool) -> String {
             s.push(',');
         }
         s.push_str(&format!(
-            "{{\"lot\":{},\"rotation\":{},\"x\":{:.2},\"y\":{:.2},\"w\":{:.2},\"d\":{:.2},\"style\":\"{}\"",
-            h.lot, h.rotation, h.rect.x, h.rect.y, h.rect.w, h.rect.d, h.house.style.id()
+            "{{\"lot\":{},\"rotation\":{:.2},\"cx\":{:.2},\"cy\":{:.2},\"style\":\"{}\",\"walkway\":{}",
+            h.lot, h.rotation, h.center.x, h.center.y, h.house.style.id(), points(&h.walkway)
         ));
         if with_seed {
             s.push_str(&format!(",\"seed\":{}", h.house.seed));
@@ -95,6 +103,8 @@ mod tests {
         assert!(json.contains("\"lots\":["), "no lots");
         assert!(json.contains("\"houses\":["), "no houses");
         assert!(json.contains("\"rotation\":"), "no rotation");
+        assert!(json.contains("\"walkway\":"), "no walkway");
+        assert!(json.contains("\"control\":"), "no street control points");
     }
 
     #[test]

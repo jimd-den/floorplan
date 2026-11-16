@@ -97,15 +97,17 @@ floorplan generate --seed 42 --style modern --obj house.obj --gltf house.gltf
 ## Neighborhoods
 
 Random layouts on top of the same house generator — no second house
-generator. Three layout families (grid, offset, cul-de-sac), picked
-by `seed % 3`, each with its own street pattern. Streets (8 m, at
-least one through-street plus cross streets), lots along the streets
+generator. Streets are Catmull-Rom spline centerlines: one meandering
+spine across the area with cul-de-sac branches ending in turnaround
+bulbs, picked by seed (ADR 0010). Lots are polygons fronting the curve
 with setbacks (front 5 m, back 3 m, sides 2 m), one house per lot,
-each facing its street. Lot size biases the style: small lots get
-Cottage/Townhouse, wide lots get Ranch/Colonial/Modern/Craftsman.
-Every house fits its lot (the maximum house extent is 26 × 16 m);
-every lot has street frontage; no two houses overlap. The default
-is 2 × 2 blocks, ~16–24 houses. See ADR 0004.
+each facing its street, with a walkway ribbon from the sidewalk to its
+entry door; sidewalks are offset ribbons (1.5 m) on both sides of every
+street. Lot size biases the style: small lots get Cottage/Townhouse,
+wide lots get Ranch/Colonial/Modern/Craftsman. Every house fits its lot
+(the maximum house extent is 26 × 16 m); every lot has street frontage;
+no two houses overlap. The default is 2 × 2 blocks, ~8–13 houses. See
+ADR 0004 and ADR 0010.
 
 ```sh
 floorplan neighborhood --seed 42

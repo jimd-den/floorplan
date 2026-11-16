@@ -1,7 +1,7 @@
 //! Camera poses: exterior, interior, and street.
 
 use floorplan::domain::geometry::Rect;
-use floorplan::domain::neighborhood::house_extent;
+use floorplan::domain::placement::house_extent;
 use floorplan::domain::model::Program;
 use floorplan::domain::style::Style;
 use floorplan::use_cases::generate::generate_house;
@@ -14,6 +14,17 @@ fn modern() -> floorplan::domain::model::House {
 
 fn inside(r: Rect, p: [f32; 3]) -> bool {
     p[0] >= r.x as f32 && p[0] <= r.right() as f32 && p[2] >= r.y as f32 && p[2] <= r.bottom() as f32
+}
+
+/// The eye stands on a street when its plan position is within
+/// half the street width (4 m) of the street's centerline.
+fn on_street(street: &floorplan::domain::neighborhood::Street, eye: [f32; 3]) -> bool {
+    let p = floorplan::domain::curve::Pt::new(eye[0] as f64, eye[2] as f64);
+    street
+        .samples
+        .points
+        .iter()
+        .any(|&q| q.dist(p) < 4.0)
 }
 
 #[test]
@@ -85,7 +96,7 @@ fn the_street_pose_picks_the_busiest_street() {
         .unwrap();
     let Pose { eye, .. } = street_pose(&n);
 
-    assert!(inside(n.streets[busiest].rect, eye), "eye must stand on the busiest street");
+    assert!(on_street(&n.streets[busiest], eye), "eye must stand on the busiest street");
 }
 
 #[test]
@@ -114,7 +125,7 @@ fn the_street_pose_stands_on_a_street_and_looks_along_it() {
     let Pose { eye, target } = street_pose(&n);
 
     assert!(
-        n.streets.iter().any(|s| inside(s.rect, eye)),
+        n.streets.iter().any(|s| on_street(s, eye)),
         "eye must stand on a street"
     );
     assert!((eye[1] - 1.7).abs() < 0.01, "eye at standing height");

@@ -118,8 +118,8 @@ fn an_invalid_style_index_is_refused() {
 }
 
 #[test]
-fn protocol_version_two_adds_chunks_without_breaking_v1() {
-    assert_eq!(PROTOCOL_VERSION, 2);
+fn protocol_version_three_adds_curved_streets_without_breaking_chunks() {
+    assert_eq!(PROTOCOL_VERSION, 3);
     let v1 = neighborhood_json(42, 2, 2).unwrap();
     let chunk = chunk_json(42, 0, 0).unwrap();
     let text = String::from_utf8(chunk).unwrap();

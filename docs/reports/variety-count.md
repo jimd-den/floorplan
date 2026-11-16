@@ -64,3 +64,20 @@ factor of ~4,500.
 **1000 distinct plan hashes**. The hash is FNV-1a over the seed-free
 plan JSON (`render_plan_json`), so distinct hashes mean distinct
 plans rather than distinct seeds. See `tests/generation.rs`.
+
+## Neighborhoods (curved streets, ADR 0010)
+
+The same honesty, for 2 × 2 neighborhoods, from street and lot
+geometry alone — before multiplying by the houses themselves.
+The three layout families are gone, so their factor of 3 is out;
+the spline choices (spine meander, branch count and placement,
+bulb side) add variety on top and are not counted here.
+
+```
+201 block sizes × 41³ lot depths × 2³ lot counts per side
+  = 201 × 41 × 41 × 41 × 8 = 110,824,968
+```
+
+**≈ 1.1 × 10⁸ distinct neighborhoods**, a floor from the most
+conservative factors alone. See `use_cases/variety.rs`
+(`neighborhood_variety_lower_bound`) and `tests/variety_bounds.rs`.

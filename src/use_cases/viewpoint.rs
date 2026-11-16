@@ -6,7 +6,8 @@
 //! the renderer.
 
 use crate::domain::model::{House, Program};
-use crate::domain::neighborhood::{Neighborhood, house_extent};
+use crate::domain::neighborhood::Neighborhood;
+use crate::domain::placement::house_extent;
 
 /// The three views the screenshot adapter can frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -146,8 +147,7 @@ fn dist2(a: (f64, f64), b: (f64, f64)) -> f64 {
 }
 
 /// Stands on the street with the most fronting lots and looks along
-/// it. A horizontal street runs east-west, so the look is east; a
-/// vertical one looks south. Starting near the street's low end gives
+/// it, 3 m in and 30 m down. Starting near the street's low end gives
 /// the longest view down it.
 pub fn street_pose(neighborhood: &Neighborhood) -> Pose {
     let busiest = (0..neighborhood.streets.len()).max_by_key(|&i| {
@@ -156,15 +156,10 @@ pub fn street_pose(neighborhood: &Neighborhood) -> Pose {
     let Some(street) = busiest.and_then(|i| neighborhood.streets.get(i)) else {
         return Pose { eye: [0.0, 1.7, 0.0], target: [0.0, 1.7, -1.0] };
     };
-    let rect = street.rect;
-    let (cx, cz) = (rect.x + rect.w / 2.0, rect.y + rect.d / 2.0);
-    let (eye, target) = if street.horizontal {
-        ([rect.x + 3.0, cz], [rect.right() - 3.0, cz])
-    } else {
-        ([cx, rect.y + 3.0], [cx, rect.bottom() - 3.0])
-    };
+    let eye = street.samples.point_at(3.0);
+    let target = street.samples.point_at(33.0);
     Pose {
-        eye: [eye[0] as f32, 1.7, eye[1] as f32],
-        target: [target[0] as f32, 1.7, target[1] as f32],
+        eye: [eye.x as f32, 1.7, eye.y as f32],
+        target: [target.x as f32, 1.7, target.y as f32],
     }
 }

@@ -2,9 +2,13 @@
 //! translation, and the neighborhood invariants per chunk.
 
 use floorplan::domain::chunk::{ChunkState, DEFAULT_CHUNK_BLOCKS};
+use floorplan::domain::curve::Pt;
+use floorplan::domain::layout::Density;
 use floorplan::domain::neighborhood::Neighborhood;
+use floorplan::domain::placement::{house_corners, house_extent};
+use floorplan::domain::polygon::{point_in_poly, polys_overlap};
 use floorplan::use_cases::chunk::{CHUNK_SPAN, build_chunk, chunk_origin, chunk_seed};
-use floorplan::use_cases::neighborhood::generate_neighborhood;
+use floorplan::use_cases::neighborhood::{generate_neighborhood, generate_neighborhood_density};
 use floorplan::use_cases::variety::neighborhood_hash;
 use std::collections::HashSet;
 
@@ -51,15 +55,48 @@ fn distinct_chunks_have_distinct_content_hashes() {
     }
 }
 
+/// Every point of a neighborhood's geometry: street samples,
+/// lot outlines, and house corners. Translation and span are
+/// properties of the whole neighborhood, not of any one layer.
+fn all_points(n: &Neighborhood) -> Vec<Pt> {
+    let mut pts: Vec<Pt> = n.streets.iter().flat_map(|s| s.samples.points.iter().copied()).collect();
+    pts.extend(n.lots.iter().flat_map(|l| l.outline.iter().copied()));
+    for h in &n.houses {
+        pts.extend(house_corners(h.center, h.rotation, house_extent(&h.house)));
+    }
+    pts
+}
+
+fn min_xy(n: &Neighborhood) -> (f64, f64) {
+    let pts = all_points(n);
+    (
+        pts.iter().map(|p| p.x).fold(f64::MAX, f64::min),
+        pts.iter().map(|p| p.y).fold(f64::MAX, f64::min),
+    )
+}
+
+fn max_xy(n: &Neighborhood) -> (f64, f64) {
+    let pts = all_points(n);
+    (
+        pts.iter().map(|p| p.x).fold(f64::MIN, f64::max),
+        pts.iter().map(|p| p.y).fold(f64::MIN, f64::max),
+    )
+}
+
 #[test]
 fn a_chunk_is_translated_to_its_origin() {
     let (x, z) = chunk_origin(1, -2);
     assert_eq!((x, z), (CHUNK_SPAN, -2.0 * CHUNK_SPAN));
-    let n = content(42, 1, -2);
-    let min_x = n.streets.iter().map(|s| s.rect.x).fold(f64::MAX, f64::min);
-    let min_y = n.streets.iter().map(|s| s.rect.y).fold(f64::MAX, f64::min);
-    assert!((min_x - x).abs() < 1e-9, "chunk not translated east");
-    assert!((min_y - z).abs() < 1e-9, "chunk not translated south");
+    // A chunk's seed depends on its coordinates, so the moved
+    // chunk is compared against its own untranslated
+    // neighborhood, not against chunk (0,0).
+    let seed = chunk_seed(42, 1, -2);
+    let plain = generate_neighborhood_density(seed, DEFAULT_CHUNK_BLOCKS, Density::from_seed(seed));
+    let moved = content(42, 1, -2);
+    let (px, py) = min_xy(&plain);
+    let (mx, my) = min_xy(&moved);
+    assert!((mx - (px + x)).abs() < 1e-9, "chunk not translated east");
+    assert!((my - (py + z)).abs() < 1e-9, "chunk not translated south");
 }
 
 #[test]
@@ -69,28 +106,33 @@ fn every_chunk_keeps_the_neighborhood_invariants() {
         let mut seen: HashSet<usize> = HashSet::new();
         for h in &n.houses {
             assert!(seen.insert(h.lot), "chunk ({cx},{cz}): two houses on one lot");
-            let lot = n.lots[h.lot].rect;
-            assert!(
-                h.rect.x >= lot.x - 1e-9
-                    && h.rect.right() <= lot.right() + 1e-9
-                    && h.rect.y >= lot.y - 1e-9
-                    && h.rect.bottom() <= lot.bottom() + 1e-9,
-                "chunk ({cx},{cz}): house outside its lot"
-            );
+            let lot = &n.lots[h.lot];
+            for c in house_corners(h.center, h.rotation, house_extent(&h.house)) {
+                assert!(
+                    point_in_poly(c, &lot.outline),
+                    "chunk ({cx},{cz}): house corner escapes its lot"
+                );
+            }
         }
         assert_eq!(n.lots.len(), n.houses.len(), "chunk ({cx},{cz}): lot/house mismatch");
         for lot in &n.lots {
-            let s = &n.streets[lot.street];
-            let touches = (lot.rect.y - s.rect.bottom()).abs() < 1e-9
-                || (lot.rect.bottom() - s.rect.y).abs() < 1e-9
-                || (lot.rect.x - s.rect.right()).abs() < 1e-9
-                || (lot.rect.right() - s.rect.x).abs() < 1e-9;
-            assert!(touches, "chunk ({cx},{cz}): lot without street frontage");
+            assert!(lot.street < n.streets.len(), "chunk ({cx},{cz}): lot fronts no street");
+            let street = &n.streets[lot.street];
+            let s0 = lot.center_s - lot.frontage / 2.0;
+            let expected = street.samples.point_at(s0).add(
+                street.samples.normal_at(s0).scale(4.0 * lot.side as f64),
+            );
+            assert!(
+                lot.outline[0].dist(expected) < 1e-6,
+                "chunk ({cx},{cz}): lot front is off its street's offset curve"
+            );
         }
         for i in 0..n.houses.len() {
             for j in i + 1..n.houses.len() {
+                let ci = house_corners(n.houses[i].center, n.houses[i].rotation, house_extent(&n.houses[i].house));
+                let cj = house_corners(n.houses[j].center, n.houses[j].rotation, house_extent(&n.houses[j].house));
                 assert!(
-                    !n.houses[i].rect.overlaps(&n.houses[j].rect),
+                    !polys_overlap(&ci, &cj),
                     "chunk ({cx},{cz}): houses overlap"
                 );
             }
@@ -102,20 +144,7 @@ fn every_chunk_keeps_the_neighborhood_invariants() {
 fn a_neighborhood_fits_inside_one_chunk_span() {
     for seed in 0..100u32 {
         let n = generate_neighborhood(seed, DEFAULT_CHUNK_BLOCKS);
-        let right = n
-            .streets
-            .iter()
-            .map(|s| &s.rect)
-            .chain(n.lots.iter().map(|l| &l.rect))
-            .map(|r| r.right())
-            .fold(0.0f64, f64::max);
-        let bottom = n
-            .streets
-            .iter()
-            .map(|s| &s.rect)
-            .chain(n.lots.iter().map(|l| &l.rect))
-            .map(|r| r.bottom())
-            .fold(0.0f64, f64::max);
+        let (right, bottom) = max_xy(&n);
         assert!(right <= CHUNK_SPAN, "seed {seed}: width {right} exceeds the chunk span");
         assert!(bottom <= CHUNK_SPAN, "seed {seed}: depth {bottom} exceeds the chunk span");
     }

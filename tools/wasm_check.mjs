@@ -41,7 +41,7 @@ const instance = await WebAssembly.instantiate(mod, {});
 const ex = instance.exports;
 const mem = () => new Uint8Array(ex.memory.buffer);
 
-check('fp_version is 2', ex.fp_version() === 2);
+check('fp_version is 3', ex.fp_version() === 3);
 
 function payload(ptr) {
   const len = ex.fp_last_len();
@@ -92,7 +92,9 @@ for (const seed of SEEDS) {
     check(`neighborhood mesh magic seed ${seed} ${blocks}`, m.magic === 'FPM1');
     check(
       `neighborhood mesh ground names seed ${seed} ${blocks}`,
-      m.names[m.names.length - 2] === 'street' && m.names[m.names.length - 1] === 'lot',
+      m.names[m.names.length - 3] === 'street'
+        && m.names[m.names.length - 2] === 'lot'
+        && m.names[m.names.length - 1] === 'sidewalk',
     );
     check(`neighborhood mesh exact length seed ${seed} ${blocks}`, m.end === m.total);
     check(`neighborhood mesh indices in range seed ${seed} ${blocks}`, [...m.indices].every((i) => i < m.verts));
@@ -108,7 +110,7 @@ for (const seed of SEEDS) {
         houseExpected += c.faces;
       }
       check(`neighborhood mesh verts seed ${seed} ${blocks}`, m.verts >= verts, `${m.verts} vs ${verts}`);
-      const groundNames = new Set(['street', 'lot', 'driveway', 'trunk', 'leaf']);
+      const groundNames = new Set(['street', 'lot', 'driveway', 'sidewalk', 'trunk', 'leaf']);
       const houseFaces = [...m.matIds].filter((id) => !groundNames.has(m.names[id])).length;
       check(`neighborhood house faces seed ${seed} ${blocks}`, houseFaces === houseExpected, `${houseFaces} vs ${houseExpected}`);
     }
