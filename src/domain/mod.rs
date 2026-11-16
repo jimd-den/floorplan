@@ -18,4 +18,5 @@ pub mod neighborhood;
 pub mod placement;
 pub mod polygon;
 pub mod spline;
+pub mod street_furniture;
 pub mod style;

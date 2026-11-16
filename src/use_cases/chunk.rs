@@ -11,11 +11,13 @@
 use crate::domain::chunk::{Chunk, ChunkState, DEFAULT_CHUNK_BLOCKS};
 use crate::domain::curve::Pt;
 use crate::domain::geometry::Rect;
-use crate::domain::lattice::LATTICE;
+use crate::domain::lattice::{LATTICE, Node};
 use crate::domain::layout::Density;
 use crate::domain::neighborhood::{Lot, Neighborhood, Street};
-use crate::use_cases::world_lots::{inside, lay_streets};
-use crate::use_cases::world_streets::streets_in;
+use crate::use_cases::road_signs::{EndKind, StreetEnds, signs_along};
+use crate::use_cases::street_lights::lamps_along;
+use crate::use_cases::world_lots::{inside, lay_streets, street_seed};
+use crate::use_cases::world_streets::{node_degree, streets_in};
 
 /// The world-space spacing between chunk origins, in metres: one
 /// lattice cell. Adjacent chunks share the streets on their border.
@@ -61,6 +63,7 @@ pub fn build_chunk(world: u32, cx: i32, cz: i32) -> Chunk {
     let density = Density::from_seed(seed);
     let streets = streets_in(world, rect);
     let (lots, houses) = keep_owned(&streets, rect, density);
+    let (lamps, signs) = keep_furniture(world, &streets, rect);
     Chunk {
         cx,
         cz,
@@ -71,8 +74,48 @@ pub fn build_chunk(world: u32, cx: i32, cz: i32) -> Chunk {
             streets,
             lots,
             houses,
+            lamps,
+            signs,
         }),
     }
+}
+
+/// The lamps and signs whose base falls in `rect`. Like lots, they
+/// are placed from the street alone, so a chunk that can see the
+/// street sees the same furniture; the half-open rect decides which
+/// chunk keeps it.
+fn keep_furniture(
+    world: u32,
+    streets: &[Street],
+    rect: Rect,
+) -> (
+    Vec<crate::domain::street_furniture::StreetLamp>,
+    Vec<crate::domain::street_furniture::RoadSign>,
+) {
+    let mut lamps = Vec::new();
+    let mut signs = Vec::new();
+    for street in streets {
+        lamps.extend(lamps_along(street).into_iter().filter(|l| inside(rect, l.position)));
+        let ends = ends_of(world, street);
+        signs.extend(
+            signs_along(street, street_seed(street), ends)
+                .into_iter()
+                .filter(|g| inside(rect, g.position)),
+        );
+    }
+    (lamps, signs)
+}
+
+/// What a street's two ends are, from the lattice: a junction when
+/// three or more kept streets meet the node, a dead end otherwise.
+fn ends_of(seed: u32, street: &Street) -> StreetEnds {
+    let last = *street.control.last().unwrap_or(&Pt::new(0.0, 0.0));
+    StreetEnds { start: end_kind(seed, street.control[0]), end: end_kind(seed, last) }
+}
+
+fn end_kind(seed: u32, p: Pt) -> EndKind {
+    let node = Node::new((p.x / LATTICE).round() as i32, (p.y / LATTICE).round() as i32);
+    if node_degree(seed, node) >= 3 { EndKind::Junction } else { EndKind::DeadEnd }
 }
 
 /// The lots whose front centre falls in `rect`, with their houses

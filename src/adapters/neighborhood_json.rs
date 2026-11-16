@@ -80,6 +80,39 @@ fn render(n: &Neighborhood, with_seed: bool) -> String {
         }
         s.push_str(&format!(",\"plan\":{}}}", render_plan_json(&h.house)));
     }
+    s.push_str("],\"lamps\":[");
+    for (i, l) in n.lamps.iter().enumerate() {
+        if i > 0 {
+            s.push(',');
+        }
+        let light = l.light(i as u32);
+        s.push_str(&format!(
+            "{{\"x\":{:.2},\"y\":{:.2},\"rotation\":{:.2},\"light\":{{\"id\":{},\"kind\":\"{}\",\"radius\":{:.2},\"state\":\"{}\"}}}}",
+            l.position.x,
+            l.position.y,
+            l.rotation,
+            light.id,
+            light.kind.id(),
+            light.radius,
+            light.state.id()
+        ));
+    }
+    // Sign text comes from a fixed alphabet (street names, STOP, a
+    // speed limit), so the hand-rolled writer needs no escaping.
+    s.push_str("],\"signs\":[");
+    for (i, g) in n.signs.iter().enumerate() {
+        if i > 0 {
+            s.push(',');
+        }
+        s.push_str(&format!(
+            "{{\"x\":{:.2},\"y\":{:.2},\"rotation\":{:.2},\"kind\":\"{}\",\"text\":\"{}\"}}",
+            g.position.x,
+            g.position.y,
+            g.rotation,
+            g.kind.id(),
+            g.text
+        ));
+    }
     s.push_str("]}");
     s
 }
@@ -105,6 +138,17 @@ mod tests {
         assert!(json.contains("\"rotation\":"), "no rotation");
         assert!(json.contains("\"walkway\":"), "no walkway");
         assert!(json.contains("\"control\":"), "no street control points");
+    }
+
+    #[test]
+    fn json_carries_lamps_with_lights_and_signs_with_text() {
+        let json = render_neighborhood_json(&generate_neighborhood(42, (2, 2)));
+        assert!(json.contains("\"lamps\":["), "no lamps");
+        assert!(json.contains("\"light\":{\"id\":0,\"kind\":\"lamp\""), "no lamp light");
+        assert!(json.contains("\"signs\":["), "no signs");
+        assert!(json.contains("\"kind\":\"stop\",\"text\":\"STOP\""), "no stop sign");
+        assert!(json.contains("\"kind\":\"street_name\""), "no street-name sign");
+        assert!(json.contains("\"kind\":\"speed_limit\""), "no speed-limit sign");
     }
 
     #[test]

@@ -34,12 +34,14 @@ pub use crate::adapters::haunt_json::{
 };
 pub use crate::adapters::mesh_payload::{MESH_MAGIC, mesh_bytes};
 
-/// The protocol version the shell checks against. Version 3 replaces
-/// the street grid with spline streets (ADR 0010): the neighborhood
-/// JSON carries street control points, lot polygons, and walkway
-/// paths. Version 2 adds chunk generation by (seed, cx, cz) and
-/// light/daylight queries; every version 1 call keeps its semantics.
-pub const PROTOCOL_VERSION: u32 = 3;
+/// The protocol version the shell checks against. Version 4 makes the
+/// map unbounded and adds street furniture (ADR 0011): a chunk is a
+/// window onto a lattice, and the neighborhood JSON carries `lamps`
+/// (with their lights) and `signs` (with their plate text). Version 3
+/// replaced the street grid with spline streets (ADR 0010); version 2
+/// added chunk generation by (seed, cx, cz). Every earlier call keeps
+/// its semantics.
+pub const PROTOCOL_VERSION: u32 = 4;
 
 /// The style index the WASM exports take: `Style::all()` order
 /// (0 Ranch, 1 Colonial, 2 Craftsman, 3 Modern, 4 Cottage,

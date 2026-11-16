@@ -41,7 +41,7 @@ const instance = await WebAssembly.instantiate(mod, {});
 const ex = instance.exports;
 const mem = () => new Uint8Array(ex.memory.buffer);
 
-check('fp_version is 3', ex.fp_version() === 3);
+check('fp_version is 4', ex.fp_version() === 4);
 
 function payload(ptr) {
   const len = ex.fp_last_len();
@@ -91,10 +91,18 @@ for (const seed of SEEDS) {
     const m = parseMesh(p);
     check(`neighborhood mesh magic seed ${seed} ${blocks}`, m.magic === 'FPM1');
     check(
-      `neighborhood mesh ground names seed ${seed} ${blocks}`,
-      m.names[m.names.length - 3] === 'street'
-        && m.names[m.names.length - 2] === 'lot'
-        && m.names[m.names.length - 1] === 'sidewalk',
+      `neighborhood mesh ground and furniture names seed ${seed} ${blocks}`,
+      m.names.slice(-7).join(',') === 'street,lot,sidewalk,lamp_post,lamp_glass,sign_post,sign_face',
+    );
+    check(`neighborhood json has lamps seed ${seed} ${blocks}`, nb.lamps.length > 0);
+    check(`neighborhood json has signs seed ${seed} ${blocks}`, nb.signs.length > 0);
+    check(
+      `neighborhood lamps carry lamp lights seed ${seed} ${blocks}`,
+      nb.lamps.every((l) => l.light && l.light.kind === 'lamp'),
+    );
+    check(
+      `neighborhood signs carry text seed ${seed} ${blocks}`,
+      nb.signs.every((g) => typeof g.text === 'string' && g.text.length > 0),
     );
     check(`neighborhood mesh exact length seed ${seed} ${blocks}`, m.end === m.total);
     check(`neighborhood mesh indices in range seed ${seed} ${blocks}`, [...m.indices].every((i) => i < m.verts));
@@ -110,7 +118,10 @@ for (const seed of SEEDS) {
         houseExpected += c.faces;
       }
       check(`neighborhood mesh verts seed ${seed} ${blocks}`, m.verts >= verts, `${m.verts} vs ${verts}`);
-      const groundNames = new Set(['street', 'lot', 'driveway', 'sidewalk', 'trunk', 'leaf']);
+      const groundNames = new Set([
+        'street', 'lot', 'driveway', 'sidewalk', 'trunk', 'leaf',
+        'lamp_post', 'lamp_glass', 'sign_post', 'sign_face',
+      ]);
       const houseFaces = [...m.matIds].filter((id) => !groundNames.has(m.names[id])).length;
       check(`neighborhood house faces seed ${seed} ${blocks}`, houseFaces === houseExpected, `${houseFaces} vs ${houseExpected}`);
     }
@@ -123,6 +134,8 @@ for (const seed of SEEDS) {
     check(`chunk json coords seed ${seed} (${cx},${cz})`, cj.chunk[0] === cx && cj.chunk[1] === cz);
     check(`chunk has streets seed ${seed} (${cx},${cz})`, cj.neighborhood.streets.length > 0);
     check(`chunk has lots seed ${seed} (${cx},${cz})`, cj.neighborhood.lots.length > 0);
+    check(`chunk has lamps seed ${seed} (${cx},${cz})`, cj.neighborhood.lamps.length > 0);
+    check(`chunk has signs seed ${seed} (${cx},${cz})`, cj.neighborhood.signs.length > 0);
     check(`chunk houses match lots seed ${seed} (${cx},${cz})`, cj.neighborhood.houses.length === cj.neighborhood.lots.length);
     chunkPlans.push(JSON.stringify(cj.neighborhood));
     const cp = payload(ex.fp_chunk_mesh(seed, cx, cz));

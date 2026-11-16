@@ -5,12 +5,19 @@
 //! Cottage/Townhouse, wide lots get Ranch/Colonial/Modern/Craftsman.
 //! Lot sizes are chosen so any generated house fits its lot with
 //! setbacks (max house extent 26 x 16 m, proven in domain::neighborhood).
+//! Street lamps and road signs are laid along the same streets; the
+//! spine's ends are dead ends, a branch starts at a junction and ends
+//! in a bulb.
 
 use crate::domain::layout::Density;
 use crate::domain::neighborhood::Neighborhood;
+use crate::domain::street_furniture::{RoadSign, StreetLamp};
 use crate::frameworks_drivers::rng::Rng;
 use crate::use_cases::lots::lay_lots;
+use crate::use_cases::road_signs::{EndKind, StreetEnds, signs_along};
+use crate::use_cases::street_lights::lamps_along;
 use crate::use_cases::street_network::plan_network;
+use crate::use_cases::world_lots::street_seed;
 
 /// Street width, in metres.
 pub const STREET_W: f64 = 8.0;
@@ -52,7 +59,26 @@ pub fn generate_neighborhood_full(
     let mut rng = Rng::new(seed);
     let streets = plan_network(&mut rng, blocks);
     let (lots, houses) = lay_lots(&mut rng, &streets, density);
-    Neighborhood { seed, blocks, streets, lots, houses }
+    let (lamps, signs) = street_furniture(&streets);
+    Neighborhood { seed, blocks, streets, lots, houses, lamps, signs }
+}
+
+/// Lamps and signs along every street. Street 0 is the spine (its
+/// ends are dead ends); every branch starts at a junction and ends
+/// in a bulb, so it gets a stop and a name sign at its approach.
+fn street_furniture(streets: &[crate::domain::neighborhood::Street]) -> (Vec<StreetLamp>, Vec<RoadSign>) {
+    let mut lamps = Vec::new();
+    let mut signs = Vec::new();
+    for (i, street) in streets.iter().enumerate() {
+        lamps.extend(lamps_along(street));
+        let ends = if i == 0 {
+            StreetEnds { start: EndKind::DeadEnd, end: EndKind::DeadEnd }
+        } else {
+            StreetEnds { start: EndKind::Junction, end: EndKind::DeadEnd }
+        };
+        signs.extend(signs_along(street, street_seed(street), ends));
+    }
+    (lamps, signs)
 }
 
 #[cfg(test)]
@@ -74,6 +100,15 @@ mod tests {
         for seed in 0..20u32 {
             let n = generate_neighborhood(seed, DEFAULT_BLOCKS);
             assert!((8..=40).contains(&n.houses.len()), "seed {seed}: {} houses", n.houses.len());
+        }
+    }
+
+    #[test]
+    fn a_neighborhood_carries_lamps_and_signs() {
+        for seed in 0..20u32 {
+            let n = generate_neighborhood(seed, DEFAULT_BLOCKS);
+            assert!(!n.lamps.is_empty(), "seed {seed}: no street lamps");
+            assert!(!n.signs.is_empty(), "seed {seed}: no road signs");
         }
     }
 }

@@ -16,6 +16,7 @@ use crate::use_cases::grounds::add_grounds;
 use crate::use_cases::neighborhood::{SIDEWALK_W, STREET_W};
 use crate::use_cases::place_mesh::append_placed;
 use crate::use_cases::ribbon::{add_flat_quad, add_ribbon};
+use crate::use_cases::street_furniture_mesh::{add_lamps, add_signs, furniture_materials};
 
 /// The street material id, appended after the house table.
 pub const STREET_MATERIAL: u32 = 39;
@@ -25,12 +26,14 @@ pub const LOT_MATERIAL: u32 = 40;
 pub const SIDEWALK_MATERIAL: u32 = 41;
 
 /// The material table for a neighborhood mesh: the house table
-/// plus street asphalt, lot grass, and sidewalk concrete.
+/// plus street asphalt, lot grass, sidewalk concrete, and street
+/// furniture.
 pub fn neighborhood_material_table() -> Vec<Material> {
     let mut table = material_table();
     table.push(Material { name: "street", color: [0.24, 0.25, 0.27] });
     table.push(Material { name: "lot", color: [0.34, 0.56, 0.26] });
     table.push(Material { name: "sidewalk", color: [0.72, 0.72, 0.70] });
+    table.extend(furniture_materials());
     table
 }
 
@@ -51,6 +54,8 @@ pub fn neighborhood_mesh(n: &Neighborhood) -> Mesh {
         add_flat_quad(&mut mesh, h.walkway[0], h.walkway[1], h.walkway[2], h.walkway[3], -0.004, crate::use_cases::materials::DRIVEWAY);
     }
     add_grounds(&mut mesh, n);
+    add_lamps(&mut mesh, &n.lamps);
+    add_signs(&mut mesh, &n.signs);
     mesh
 }
 
@@ -114,8 +119,8 @@ mod tests {
         assert_eq!(mesh.materials.len(), mesh.faces.len(), "material count");
         assert_eq!(
             mesh.material_table.len(),
-            crate::use_cases::materials::material_table().len() + 3,
-            "house materials plus street, lot, and sidewalk"
+            crate::use_cases::materials::material_table().len() + 7,
+            "house materials plus street, lot, sidewalk, and furniture"
         );
     }
 

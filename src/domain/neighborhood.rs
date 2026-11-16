@@ -12,6 +12,7 @@
 
 use crate::domain::curve::{Polyline, Pt};
 use crate::domain::model::House;
+use crate::domain::street_furniture::{RoadSign, StreetLamp};
 
 /// A street: a Catmull-Rom centerline through `control`, sampled
 /// into `samples`. `bulb_at` is the arc length where a turnaround
@@ -75,4 +76,8 @@ pub struct Neighborhood {
     pub streets: Vec<Street>,
     pub lots: Vec<Lot>,
     pub houses: Vec<PlacedHouse>,
+    /// Street lamps, in document order (their light ids are indices).
+    pub lamps: Vec<StreetLamp>,
+    /// Road signs, in document order.
+    pub signs: Vec<RoadSign>,
 }
