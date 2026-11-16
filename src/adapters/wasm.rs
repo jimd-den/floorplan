@@ -8,7 +8,7 @@
 //! - Every payload export returns a pointer to its bytes and
 //!   records the length in `fp_last_len()`; a null pointer means
 //!   the call was refused and the length is 0.
-//! - `fp_version()` returns the protocol version (3).
+//! - `fp_version()` returns the protocol version (4).
 //! - JSON payloads are the same text the CLI writers emit.
 //! - Mesh payloads are the binary format `mesh_bytes` documents.
 //!

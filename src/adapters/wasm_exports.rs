@@ -55,7 +55,7 @@ pub extern "C" fn fp_last_len() -> u32 {
     LAST_LEN.load(Ordering::Relaxed)
 }
 
-/// The protocol version (2).
+/// The protocol version (4).
 #[unsafe(no_mangle)]
 pub extern "C" fn fp_version() -> u32 {
     PROTOCOL_VERSION
@@ -87,8 +87,8 @@ pub extern "C" fn fp_neighborhood_mesh(seed: u32, cols: u32, rows: u32) -> *mut 
     leak_payload(neighborhood_mesh_bytes(seed, cols, rows))
 }
 
-/// The JSON for chunk (cx, cz) of the infinite neighborhood. Chunk
-/// (0,0) carries the fixed neighborhood's JSON.
+/// The JSON for chunk (cx, cz) of the infinite neighborhood: a window
+/// onto the lattice, generated from its coordinates alone.
 #[unsafe(no_mangle)]
 pub extern "C" fn fp_chunk_json(seed: u32, cx: i32, cz: i32) -> *mut u8 {
     leak_payload(chunk_json(seed, cx, cz))
