@@ -1,18 +1,18 @@
-//! Chunk: one unit of the infinite neighborhood.
+//! Chunk: one window onto the infinite neighborhood.
 //!
-//! A chunk is a 2x2-block neighborhood derived only from the world
-//! seed and its coordinates. Chunk (0,0) is the fixed neighborhood
-//! the CLI already emits; every other chunk is translated to its
-//! own origin. The lifecycle state lives here; the transitions live
-//! in `use_cases::stream`.
+//! A chunk is one lattice cell (ADR 0011). Its content is derived only
+//! from the world seed and its coordinates, so a revisit rebuilds it
+//! byte-identically and two neighbouring chunks draw the street they
+//! share the same way. The lifecycle state and the level-of-detail
+//! tiers live here; generation is in `use_cases::chunk` and the
+//! transitions are in `use_cases::stream`.
 
 use crate::domain::neighborhood::Neighborhood;
 
-/// Blocks per chunk. One chunk is one fixed 2x2 neighborhood.
+/// The `blocks` value a chunk reports. A chunk is one lattice cell,
+/// not a grid of street cells; the field is kept so the neighborhood
+/// document has one shape for the finite generator and for chunks.
 pub const DEFAULT_CHUNK_BLOCKS: (u32, u32) = (2, 2);
-
-/// World-space spacing between chunk origins, in metres (400 m).
-pub const CHUNK_SPAN: f64 = 400.0;
 
 /// Where a chunk is in its lifecycle. A chunk is generated off the
 /// main path and installed at a metered rate; an evicted chunk is
