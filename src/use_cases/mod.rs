@@ -56,6 +56,8 @@ pub mod upper;
 pub mod variety;
 pub mod viewpoint;
 pub mod walkway;
+pub mod world_lots;
+pub mod world_streets;
 pub mod walls;
 pub mod window_clear;
 pub mod windows;

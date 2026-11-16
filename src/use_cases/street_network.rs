@@ -100,7 +100,7 @@ fn branch_street(rng: &mut Rng, spine: &Street, start: Pt, s: f64, side: i8, row
 
 /// The 300° turnaround arc around `centre`, starting at `end`
 /// (which is on the circle) and continuing the approach tangent.
-fn bulb_arc(end: Pt, centre: Pt, left: bool) -> Vec<Pt> {
+pub(crate) fn bulb_arc(end: Pt, centre: Pt, left: bool) -> Vec<Pt> {
     let radius = end.sub(centre).len();
     let start_angle = (end.y - centre.y).atan2(end.x - centre.x);
     let sweep = 5.0 * std::f64::consts::PI / 3.0;

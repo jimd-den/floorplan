@@ -1,7 +1,7 @@
 //! Chunk JSON: the chunk coordinates and state, plus the neighborhood
 //! text the CLI already emits. The neighborhood document is reused
-//! verbatim, so chunk (0,0) carries exactly the fixed neighborhood's
-//! JSON and the shell parses one shape for every chunk.
+//! verbatim, so the shell parses one shape for every chunk: a chunk is
+//! a window onto the unbounded map, not a special origin.
 
 use crate::adapters::neighborhood_json::render_neighborhood_json;
 use crate::domain::chunk::Chunk;

@@ -80,7 +80,8 @@ pub fn neighborhood_mesh_bytes(seed: u32, cols: u32, rows: u32) -> Result<Vec<u8
 
 /// The JSON for one chunk of the infinite neighborhood: its
 /// coordinates, lifecycle state, and the neighborhood document.
-/// Chunk (0,0) carries the fixed neighborhood's JSON verbatim.
+/// Every chunk is a window onto the unbounded map, generated from
+/// its coordinates alone.
 pub fn chunk_json(seed: u32, cx: i32, cz: i32) -> Result<Vec<u8>, String> {
     render_chunk_json(&build_chunk(seed, cx, cz))
         .map(String::into_bytes)
@@ -88,7 +89,7 @@ pub fn chunk_json(seed: u32, cx: i32, cz: i32) -> Result<Vec<u8>, String> {
 }
 
 /// The mesh for one chunk, in the binary format `mesh_bytes`
-/// documents. Chunk (0,0) is the fixed neighborhood's mesh.
+/// documents: the extrusion of that chunk's own neighborhood.
 pub fn chunk_mesh_bytes(seed: u32, cx: i32, cz: i32) -> Result<Vec<u8>, String> {
     let chunk = build_chunk(seed, cx, cz);
     let neighborhood = chunk

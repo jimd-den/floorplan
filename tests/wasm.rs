@@ -10,6 +10,7 @@ use floorplan::adapters::wasm::{
     neighborhood_json, neighborhood_mesh_bytes,
 };
 use floorplan::domain::style::Style;
+use floorplan::use_cases::chunk::build_chunk;
 use floorplan::use_cases::extrude::extrude;
 use floorplan::use_cases::generate::generate_house;
 use floorplan::use_cases::neighborhood::generate_neighborhood;
@@ -118,21 +119,25 @@ fn an_invalid_style_index_is_refused() {
 }
 
 #[test]
-fn protocol_version_three_adds_curved_streets_without_breaking_chunks() {
+fn a_chunk_json_carries_its_own_coordinates_and_neighborhood() {
     assert_eq!(PROTOCOL_VERSION, 3);
-    let v1 = neighborhood_json(42, 2, 2).unwrap();
-    let chunk = chunk_json(42, 0, 0).unwrap();
-    let text = String::from_utf8(chunk).unwrap();
+    let text = String::from_utf8(chunk_json(42, 0, 0).unwrap()).unwrap();
     assert!(text.contains("\"chunk\":[0,0]"));
-    assert!(
-        text.contains(&String::from_utf8(v1).unwrap()),
-        "chunk (0,0) must embed the fixed neighborhood verbatim"
-    );
+    assert!(text.contains("\"streets\":["), "a chunk carries streets");
+    assert!(text.contains("\"control\":["), "streets are spline control points");
+    // A chunk is a window onto the unbounded map, so the origin is
+    // served exactly like any other window: its content is its own.
+    assert_ne!(chunk_json(42, 0, 0).unwrap(), chunk_json(42, 1, 0).unwrap());
 }
 
 #[test]
-fn chunk_mesh_for_the_origin_is_the_fixed_neighborhood_mesh() {
-    assert_eq!(chunk_mesh_bytes(42, 0, 0).unwrap(), neighborhood_mesh_bytes(42, 2, 2).unwrap());
+fn a_chunk_mesh_is_the_extrusion_of_that_chunk() {
+    let chunk = build_chunk(42, 0, 0);
+    let neighborhood = chunk.neighborhood.expect("a built chunk has content");
+    assert_eq!(
+        chunk_mesh_bytes(42, 0, 0).unwrap(),
+        mesh_bytes(&neighborhood_mesh(&neighborhood))
+    );
 }
 
 #[test]

@@ -1,24 +1,29 @@
-//! chunk: a neighborhood chunk derived only from (world seed, cx, cz).
+//! chunk: one window onto the unbounded neighborhood.
 //!
-//! Chunk (0,0) is the fixed 2x2 neighborhood, unchanged. Every other
-//! chunk is a 2x2-block neighborhood generated from a seed mixed from
-//! the world seed and the coordinates, then translated to its chunk
-//! origin. Nothing here reads visit order, wall-clock time, or player
-//! state, so a revisit rebuilds byte-identical content.
+//! A chunk is one lattice cell. Its content is derived only from the
+//! world seed and its coordinates: the streets near the cell, the lots
+//! whose front centre falls inside it, and one house per lot. There is
+//! no block count and no fixed size — a 2x2 or 3x3 neighborhood is
+//! simply four or nine windows, and the window can be moved anywhere in
+//! `i32` space. Nothing here reads visit order, wall-clock time, or
+//! player state, so a revisit rebuilds byte-identical content.
 
 use crate::domain::chunk::{Chunk, ChunkState, DEFAULT_CHUNK_BLOCKS};
-use crate::domain::curve::{Polyline, Pt};
+use crate::domain::curve::Pt;
+use crate::domain::geometry::Rect;
+use crate::domain::lattice::LATTICE;
 use crate::domain::layout::Density;
-use crate::domain::neighborhood::Neighborhood;
-use crate::use_cases::neighborhood::{generate_neighborhood, generate_neighborhood_density};
+use crate::domain::neighborhood::{Lot, Neighborhood, Street};
+use crate::use_cases::world_lots::{inside, lay_streets};
+use crate::use_cases::world_streets::streets_in;
 
-/// The world-space spacing between chunk origins, in metres. It is
-/// larger than any 2x2 neighborhood, so adjacent chunks never touch.
-pub const CHUNK_SPAN: f64 = 400.0;
+/// The world-space spacing between chunk origins, in metres: one
+/// lattice cell. Adjacent chunks share the streets on their border.
+pub const CHUNK_SPAN: f64 = LATTICE;
 
 /// The seed a chunk generates from. Chunk (0,0) keeps the world seed
-/// so the fixed neighborhood is unchanged; every other chunk mixes
-/// the seed with its coordinates.
+/// so the origin's neighborhood is the canonical one; every other
+/// chunk mixes the seed with its coordinates.
 pub fn chunk_seed(world: u32, cx: i32, cz: i32) -> u32 {
     if cx == 0 && cz == 0 {
         return world;
@@ -41,46 +46,69 @@ pub fn chunk_origin(cx: i32, cz: i32) -> (f64, f64) {
     (cx as f64 * CHUNK_SPAN, cz as f64 * CHUNK_SPAN)
 }
 
+/// The half-open rectangle a chunk owns. Every point of the plane
+/// belongs to exactly one chunk, which is how lots are partitioned.
+pub fn chunk_rect(cx: i32, cz: i32) -> Rect {
+    let (x, y) = chunk_origin(cx, cz);
+    Rect::new(x, y, CHUNK_SPAN, CHUNK_SPAN)
+}
+
 /// Builds a finished chunk. Deterministic in the world seed and the
-/// coordinates; chunk (0,0) is exactly `generate_neighborhood(world,
-/// DEFAULT_CHUNK_BLOCKS)`.
+/// coordinates, and independent of every other chunk.
 pub fn build_chunk(world: u32, cx: i32, cz: i32) -> Chunk {
     let seed = chunk_seed(world, cx, cz);
-    let neighborhood = if cx == 0 && cz == 0 {
-        generate_neighborhood(seed, DEFAULT_CHUNK_BLOCKS)
-    } else {
-        generate_neighborhood_density(seed, DEFAULT_CHUNK_BLOCKS, Density::from_seed(seed))
-    };
-    let (dx, dz) = chunk_origin(cx, cz);
+    let rect = chunk_rect(cx, cz);
+    let density = Density::from_seed(seed);
+    let streets = streets_in(world, rect);
+    let (lots, houses) = keep_owned(&streets, rect, density);
     Chunk {
         cx,
         cz,
         state: ChunkState::Ready,
-        neighborhood: Some(translate(neighborhood, dx, dz)),
+        neighborhood: Some(Neighborhood {
+            seed,
+            blocks: DEFAULT_CHUNK_BLOCKS,
+            streets,
+            lots,
+            houses,
+        }),
     }
 }
 
-/// Translates every world-space point in a neighborhood. A zero
-/// offset returns the neighborhood untouched, which keeps chunk (0,0)
-/// byte-identical to the fixed neighborhood. Arc lengths (`bulb_at`,
-/// `center_s`, `junctions`) are translation-invariant, so they do
-/// not move.
-fn translate(mut n: Neighborhood, dx: f64, dz: f64) -> Neighborhood {
-    if dx == 0.0 && dz == 0.0 {
-        return n;
+/// The lots whose front centre falls in `rect`, with their houses
+/// re-indexed onto the kept list. A lot is laid the same way in every
+/// chunk that can see its street; only the owner keeps it.
+///
+/// The whole visible set is laid first, because the cross-street
+/// conflict rule (`lay_streets`) has to see a lot that reaches into
+/// the chunk even when its front centre is outside it. That rule is
+/// keyed on street geometry alone, so every chunk that can see these
+/// streets drops exactly the same lots.
+fn keep_owned(
+    streets: &[Street],
+    rect: Rect,
+    density: Density,
+) -> (Vec<Lot>, Vec<crate::domain::neighborhood::PlacedHouse>) {
+    let (laid, laid_houses) = lay_streets(streets, density);
+    let mut lots: Vec<Lot> = Vec::new();
+    let mut houses = Vec::new();
+    for (lot, mut house) in laid.into_iter().zip(laid_houses) {
+        if !inside(rect, front_centre(&streets[lot.street], &lot)) {
+            continue;
+        }
+        house.lot = lots.len();
+        lots.push(lot);
+        houses.push(house);
     }
-    let shift = |p: Pt| Pt::new(p.x + dx, p.y + dz);
-    for street in &mut n.streets {
-        street.control = street.control.iter().map(|&p| shift(p)).collect();
-        street.samples = Polyline::new(street.samples.points.iter().map(|&p| shift(p)).collect());
-        street.bulb_center = street.bulb_center.map(shift);
-    }
-    for lot in &mut n.lots {
-        lot.outline = lot.outline.iter().map(|&p| shift(p)).collect();
-    }
-    for house in &mut n.houses {
-        house.center = shift(house.center);
-        house.walkway = house.walkway.map(shift);
-    }
-    n
+    (lots, houses)
+}
+
+/// The front centre of a lot: the point on its street's offset curve at
+/// the lot's centre arc length. Unique per lot, so exactly one chunk
+/// owns it.
+pub fn front_centre(street: &Street, lot: &Lot) -> Pt {
+    street
+        .samples
+        .point_at(lot.center_s)
+        .add(street.samples.normal_at(lot.center_s).scale(4.0 * lot.side as f64))
 }

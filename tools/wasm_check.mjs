@@ -121,6 +121,9 @@ for (const seed of SEEDS) {
   for (const [cx, cz] of CHUNKS) {
     const cj = JSON.parse(readJson(ex.fp_chunk_json(seed, cx, cz)));
     check(`chunk json coords seed ${seed} (${cx},${cz})`, cj.chunk[0] === cx && cj.chunk[1] === cz);
+    check(`chunk has streets seed ${seed} (${cx},${cz})`, cj.neighborhood.streets.length > 0);
+    check(`chunk has lots seed ${seed} (${cx},${cz})`, cj.neighborhood.lots.length > 0);
+    check(`chunk houses match lots seed ${seed} (${cx},${cz})`, cj.neighborhood.houses.length === cj.neighborhood.lots.length);
     chunkPlans.push(JSON.stringify(cj.neighborhood));
     const cp = payload(ex.fp_chunk_mesh(seed, cx, cz));
     const cm = parseMesh(cp);
@@ -132,12 +135,6 @@ for (const seed of SEEDS) {
     check(`chunk mesh deterministic seed ${seed} (${cx},${cz})`, Buffer.compare(Buffer.from(cp), Buffer.from(cp2)) === 0);
   }
   check(`chunks are distinct seed ${seed}`, new Set(chunkPlans).size === CHUNKS.length);
-  const origin = JSON.parse(readJson(ex.fp_chunk_json(seed, 0, 0)));
-  const fixed = JSON.parse(readJson(ex.fp_neighborhood_json(seed, 2, 2)));
-  check(`chunk (0,0) is the fixed neighborhood seed ${seed}`, JSON.stringify(origin.neighborhood) === JSON.stringify(fixed));
-  const originMesh = payload(ex.fp_chunk_mesh(seed, 0, 0));
-  const fixedMesh = payload(ex.fp_neighborhood_mesh(seed, 2, 2));
-  check(`chunk (0,0) mesh is the fixed mesh seed ${seed}`, Buffer.compare(Buffer.from(originMesh), Buffer.from(fixedMesh)) === 0);
 
   const lights = JSON.parse(readJson(ex.fp_house_lights(seed, 3)));
   check(`house lights have a flashlight seed ${seed}`, lights.some((l) => l.kind === 'flashlight'));

@@ -9,6 +9,7 @@ pub mod furniture;
 pub mod geometry;
 pub mod haunt;
 pub mod interaction;
+pub mod lattice;
 pub mod layout;
 pub mod light;
 pub mod mesh;
