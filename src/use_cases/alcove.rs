@@ -8,15 +8,21 @@
 //! 2.4 m strip off the west side (orientation A) or the north
 //! side (orientation B), splits the strip into a 2.4 x 2.5 m leaf
 //! (6 sq m, exactly the bath cap) and a remainder, and subdivides
-//! the rest normally. The pinned leaf always has an exterior edge
-//! — the west edge in A, the north edge in B — so it still gets a
-//! window. A rect can hold several strips, one per pin, so a rect
-//! with two over-cap baths gets two alcoves.
+//! the rest normally. ADR 0014: the remainder is itself split
+//! into aspect-valid pieces — a 2.4 m strip off a deep rect is a
+//! long thin leaf, and a single cut cannot fix it. The pinned leaf
+//! always has an exterior edge — the west edge in A, the north
+//! edge in B — so it still gets a window. A rect can hold several
+//! strips, one per pin, so a rect with two over-cap baths gets two
+//! alcoves.
 
 use crate::domain::geometry::{Axis, Rect, Segment};
 use crate::domain::model::Program;
+use crate::domain::room_size::HABITABLE_MIN_AREA;
 use crate::frameworks_drivers::rng::Rng;
 use crate::use_cases::bsp::{Split, subdivide};
+use crate::use_cases::split_pieces::record_piece_splits;
+use crate::use_cases::long_rect::split_long_rect;
 use crate::use_cases::footprint::MIN_SIDE;
 
 /// The bath leaf: 2.4 m wide, 2.5 m deep, exactly 6 sq m.
@@ -46,8 +52,10 @@ pub struct AlcoveSubdivision {
     pub leaves: Vec<Rect>,
     pub splits: Vec<Split>,
     /// (leaf index, program) pins, in leaf order. The alcove
-    /// leaves are the first leaf of each strip: indices
-    /// 0, 2, 4, ... — one per pin.
+    /// leaves are the first leaf of each strip — one per pin.
+    /// Each strip holds one bath leaf plus the aspect-valid
+    /// pieces of its remainder, so the pin indices are not
+    /// evenly spaced.
     pub pins: Vec<(usize, Program)>,
 }
 
@@ -113,7 +121,14 @@ pub fn subdivide_with_alcove(
         };
         out_pins.push((leaves.len(), pin));
         leaves.push(bath_leaf);
-        leaves.push(strip_rest);
+        // ADR 0014: the strip remainder is a long thin leaf (2.4 m
+        // by the rect depth minus 2.5 m) — a bowling-alley bedroom
+        // when assigned. Split it into aspect-valid pieces, and
+        // record the boundary between each pair of pieces so the
+        // skeleton walls it.
+        let pieces = split_long_rect(strip_rest);
+        record_piece_splits(&mut splits, &pieces, strip_rest.w >= strip_rest.d);
+        leaves.extend(pieces);
         splits.push(strip_split);
         splits.push(rest_split);
         rest = new_rest;
@@ -125,8 +140,60 @@ pub fn subdivide_with_alcove(
     // average leaf at the rect's original average.
     let by_area = ((target as f64) * rest.area() / rect.area()).ceil() as usize;
     let rest_target = target.saturating_sub(2 * n).max(by_area).max(1);
+    // ADR 0015: the rest is the only source of habitable leaves
+    // once strips are carved (strip leaves are all <= 6.0 sq m),
+    // so it must be asked for at least the three core rooms —
+    // and at most one leaf per 6.5 sq m, so it is not sliced
+    // into dead pieces.
+    let cap = (rest.area() / HABITABLE_MIN_AREA).floor() as usize;
+    let lo = 3usize.min(cap).max(1);
+    let hi = cap.max(1);
+    let rest_target = rest_target.clamp(lo, hi);
     let rest_sub = subdivide(rng, rest, rest_target);
     leaves.extend(rest_sub.leaves);
     splits.extend(rest_sub.splits);
     AlcoveSubdivision { leaves, splits, pins: out_pins }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::room_size::{ASPECT_HARD_CAP, aspect};
+
+    #[test]
+    fn the_alcove_strip_remainder_is_split_into_aspect_valid_pieces() {
+        // Regression: Colonial seed 7 floor 1 had a 2.4 x 10.3 m
+        // bedroom (4.29:1) — the alcove strip remainder, left as
+        // one leaf and assigned a bedroom.
+        let mut rng = Rng::new(7);
+        let sub = subdivide_with_alcove(
+            &mut rng,
+            Rect::new(0.0, 0.0, 14.9, 12.8),
+            9,
+            &[Program::Bath, Program::Bath],
+        );
+        for leaf in &sub.leaves {
+            assert!(
+                aspect(leaf) <= ASPECT_HARD_CAP + 1e-6,
+                "leaf {leaf:?} is {:.2}:1",
+                aspect(leaf)
+            );
+        }
+    }
+
+    #[test]
+    fn the_pinned_leaves_are_still_bath_sized() {
+        let mut rng = Rng::new(7);
+        let sub = subdivide_with_alcove(
+            &mut rng,
+            Rect::new(0.0, 0.0, 14.9, 12.8),
+            9,
+            &[Program::Bath, Program::Bath],
+        );
+        assert_eq!(sub.pins.len(), 2);
+        for (idx, _) in &sub.pins {
+            let leaf = sub.leaves[*idx];
+            assert!((leaf.area() - 6.0).abs() < 1e-9, "leaf {leaf:?}");
+        }
+    }
 }

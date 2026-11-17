@@ -63,13 +63,30 @@ pub(crate) fn dist(c: (f64, f64), r: &Rect) -> f64 {
 }
 
 /// The front leaf: touches the southern edge, nearest the centre-x.
+/// ADR 0015 (11): among the southernmost leaves, a leaf that is
+/// not room-sized wins over a room-sized one — an entry must
+/// never be a room when a foyer leaf sits at the front. The
+/// centre-x rule only breaks ties within each class.
 pub(crate) fn front_leaf(leaves: &[Rect], ids: &[usize]) -> usize {
     let max_bottom = ids.iter().map(|&i| leaves[i].bottom()).fold(f64::MIN, f64::max);
     let cx = (leaves.iter().map(|r| r.x).fold(f64::MAX, f64::min)
         + leaves.iter().map(|r| r.right()).fold(f64::MIN, f64::max))
         / 2.0;
-    *ids.iter()
-        .filter(|&&i| (leaves[i].bottom() - max_bottom).abs() < 1e-9)
+    let front: Vec<usize> = ids
+        .iter()
+        .copied()
+        .filter(|&i| (leaves[i].bottom() - max_bottom).abs() < 1e-9)
+        .collect();
+    let foyer = front
+        .iter()
+        .copied()
+        .filter(|&i| !crate::domain::room_size::is_room_sized(&leaves[i]));
+    let pool: Vec<usize> = {
+        let foyer: Vec<usize> = foyer.collect();
+        if foyer.is_empty() { front } else { foyer }
+    };
+    *pool
+        .iter()
         .min_by(|a, b| {
             (leaves[**a].center().0 - cx)
                 .abs()

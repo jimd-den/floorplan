@@ -12,9 +12,12 @@ use crate::frameworks_drivers::rng::Rng;
 use crate::use_cases::alcove::subdivide_with_alcove;
 use crate::use_cases::bsp::subdivide;
 use crate::use_cases::caps::cap_room_sizes;
+use crate::use_cases::demote::demote_over_cap_baths;
 use crate::use_cases::distribute::distribute;
 use crate::use_cases::doors::place_doors;
+use crate::use_cases::entry_shrink::shrink_room_sized_entry;
 use crate::use_cases::garage::place_garage;
+use crate::use_cases::habitable_floor::enforce_habitable_floor_rooms;
 use crate::use_cases::programs::assign_programs_pinned;
 use crate::use_cases::repair_window::repair_interior_rooms;
 use crate::use_cases::retile::find_retile_target;
@@ -34,8 +37,12 @@ pub fn build_floor_retiled(
     let mut overrides: Vec<(usize, Program)> = vec![];
     loop {
         let start_next = *next_room;
-        let floor = build_floor(rng, rects, joins, level, style, next_room, garage, &overrides);
+        let mut floor = build_floor(rng, rects, joins, level, style, next_room, garage, &overrides);
         let Some(target) = find_retile_target(&floor.rooms, rects, &overrides) else {
+            // No rect admits an alcove for the rooms that
+            // remain: demote a residual over-cap bath to
+            // Laundry rather than emit it over its cap.
+            demote_over_cap_baths(&mut floor.rooms);
             return floor;
         };
         overrides.push((target.rect, target.program));
@@ -106,6 +113,13 @@ pub fn build_floor(
     cap_room_sizes(&mut rooms, &mut splits, next_room);
     // A strip cut can leave a room windowless; repair again.
     repair_interior_rooms(&mut rooms, &pinned_ids);
+    // A window swap can land a habitable program on a sub-floor
+    // leaf after the assignment-time choke ran; re-choke here.
+    enforce_habitable_floor_rooms(&mut rooms);
+    // ADR 0015: a room-sized entry that can give depth to its
+    // northern neighbour shrinks to a foyer here, before the
+    // skeleton is built from the rooms and splits.
+    shrink_room_sized_entry(&mut rooms, &mut splits);
     let entry = rooms
         .iter()
         .find(|r| r.program == Program::Entry)
@@ -135,57 +149,3 @@ pub fn upper_rects(fp: &Footprint, style: Style) -> Vec<Rect> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::domain::model::Program as P;
-    use crate::use_cases::caps::cap_for;
-    use crate::use_cases::footprint::footprint;
-
-    fn floor_rooms(seed: u32, style: Style) -> Floor {
-        let mut rng = Rng::new(seed);
-        let fp = footprint(&mut rng, style);
-        let mut next_room = 0;
-        build_floor_retiled(&mut rng, &fp.rects, &fp.joins, 0, style, &mut next_room, fp.garage)
-    }
-
-    #[test]
-    fn re_tiling_is_deterministic() {
-        let a = floor_rooms(97, Style::Modern);
-        let b = floor_rooms(97, Style::Modern);
-        assert_eq!(a, b);
-    }
-
-    #[test]
-    fn the_seed_97_modern_bath_is_capped_after_re_tiling() {
-        // Seed 97 Modern carried a 53.0 sq m bath (15.6 x 3.4 m).
-        let floor = floor_rooms(97, Style::Modern);
-        for room in &floor.rooms {
-            if let Some(cap) = cap_for(room.program) {
-                assert!(
-                    room.rect.area() <= cap + 1e-9,
-                    "{:?} room {} is {:.1} sq m",
-                    room.program,
-                    room.id,
-                    room.rect.area()
-                );
-            }
-        }
-        assert!(floor.rooms.iter().any(|r| r.program == P::Bath), "the floor lost its bath");
-    }
-
-    #[test]
-    fn a_re_tiled_floor_still_tiles_its_footprint() {
-        let mut rng = Rng::new(97);
-        let fp = footprint(&mut rng, Style::Modern);
-        let floor = floor_rooms(97, Style::Modern);
-        let footprint_area: f64 = fp.rects.iter().map(|r| r.area()).sum();
-        let rooms_area: f64 = floor
-            .rooms
-            .iter()
-            .filter(|r| r.program != P::Garage)
-            .map(|r| r.rect.area())
-            .sum();
-        assert!((footprint_area - rooms_area).abs() < 1e-6, "area changed");
-    }
-}

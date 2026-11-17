@@ -6,6 +6,7 @@
 
 use crate::domain::geometry::Rect;
 use crate::domain::model::Program;
+use crate::use_cases::core_rooms::{bedroom_reserve_holds, pick_kitchen};
 use crate::use_cases::placement::{
     adjacent, adjacent_or_nearest, adjacent_to_either_set, farthest, farthest_exterior,
     front_leaf, largest, largest_exterior, smallest, smallest_adjacent_or_nearest,
@@ -27,7 +28,7 @@ pub(crate) fn assign_ground(
     if remaining.is_empty() {
         return out;
     }
-    if n >= 5 {
+    if n >= 5 && !pins.iter().any(|&(_, p)| p == Program::Entry) {
         let entry = front_leaf(leaves, &remaining);
         take(&mut remaining, &mut out, entry, Program::Entry);
     }
@@ -37,14 +38,12 @@ pub(crate) fn assign_ground(
     // smaller one, and the interior leaf becomes laundry.
     let living = largest_exterior(leaves, &remaining).unwrap_or_else(|| largest(leaves, &remaining));
     take(&mut remaining, &mut out, living, Program::Living);
-    // Kitchen wants daylight too: the largest exterior leaf next
-    // to living, falling back to the nearest when no neighbour
-    // can hold a window.
-    let near = adjacent(leaves, living, &remaining);
-    let kitchen = largest_exterior(leaves, &near)
-        .unwrap_or_else(|| adjacent_or_nearest(leaves, living, &remaining));
+    // Kitchen wants daylight too — and a habitable leaf (ADR
+    // 0015): `pick_kitchen` prefers a habitable neighbour, else
+    // the nearest habitable leaf, else the old rule.
+    let kitchen = pick_kitchen(leaves, living, &remaining);
     take(&mut remaining, &mut out, kitchen, Program::Kitchen);
-    if two_storey && !remaining.is_empty() {
+    if two_storey && !remaining.is_empty() && !pins.iter().any(|&(_, p)| p == Program::Hall) {
         // The hall is circulation: it takes an interior leaf when
         // one sits next to living, leaving daylight for the rooms.
         let near = adjacent(leaves, living, &remaining);
@@ -63,36 +62,46 @@ pub(crate) fn assign_ground(
         } else {
             largest_exterior(leaves, &near).unwrap_or_else(|| largest(leaves, &near))
         };
-        take(&mut remaining, &mut out, dining, Program::Dining);
+        if bedroom_reserve_holds(leaves, &remaining, dining) {
+            take(&mut remaining, &mut out, dining, Program::Dining);
+        }
     }
     if remaining.len() >= 6 {
-        // A study is far from living — but it must fit the cap,
-        // or be a leaf the strip cut can carve to it. Prefer the
-        // farthest exterior leaf that fits; a leaf too big for a
-        // study, and too squat to cut, is a bedroom, not a study.
+        // A study is far from living, fits the cap (or a leaf
+        // the strip cut can carve to it), and meets the habitable
+        // floor: a 6.0 sq m alcove leaf is a bath, not a study,
+        // and the choke turns a sub-floor study into laundry,
+        // wasting the leaf a bath needs (seed 103 Colonial).
+        // A leaf too big for a study, and too squat to cut, is
+        // a bedroom, not a study.
         let study_cap = crate::use_cases::caps::cap_for(Program::Study).unwrap_or(f64::INFINITY);
         let fitting: Vec<usize> = remaining
             .iter()
             .copied()
             .filter(|&i| {
-                leaves[i].area() <= study_cap + 1e-9
-                    || crate::use_cases::cap_cut::is_cuttable(&leaves[i], study_cap)
+                leaves[i].area() >= crate::domain::room_size::HABITABLE_MIN_AREA - 1e-9
+                    && (leaves[i].area() <= study_cap + 1e-9
+                        || crate::use_cases::cap_cut::is_cuttable(&leaves[i], study_cap))
             })
             .collect();
-        let study = if fitting.is_empty() {
-            farthest_exterior(leaves, living, &remaining)
-                .unwrap_or_else(|| farthest(leaves, living, &remaining))
-        } else {
-            farthest_exterior(leaves, living, &fitting)
-                .unwrap_or_else(|| farthest(leaves, living, &fitting))
-        };
-        take(&mut remaining, &mut out, study, Program::Study);
+        // ADR 0015 (9): no fitting leaf means no Study — the
+        // farthest leaf is an over-cap, uncuttable leaf the
+        // bed/bath rule promotes to a Bedroom instead.
+        if !fitting.is_empty() {
+            let study = farthest_exterior(leaves, living, &fitting)
+                .unwrap_or_else(|| farthest(leaves, living, &fitting));
+            if bedroom_reserve_holds(leaves, &remaining, study) {
+                take(&mut remaining, &mut out, study, Program::Study);
+            }
+        }
     }
     if remaining.len() >= 5 {
         // Laundry needs no window: it takes an interior leaf first.
         let laundry = smallest_interior(leaves, &remaining)
             .unwrap_or_else(|| smallest(leaves, &remaining));
-        take(&mut remaining, &mut out, laundry, Program::Laundry);
+        if bedroom_reserve_holds(leaves, &remaining, laundry) {
+            take(&mut remaining, &mut out, laundry, Program::Laundry);
+        }
     }
     assign_bed_bath(leaves, &remaining, living, &mut out, pinned_bath_count(pins));
     out
@@ -152,6 +161,27 @@ mod tests {
             assert!(got.contains(&Program::Bedroom), "seed {seed}");
             assert!(got.contains(&Program::Bath), "seed {seed}");
         }
+    }
+
+    #[test]
+    fn a_pinned_entry_is_the_only_entry() {
+        // ADR 0014: when the re-tiling alcove pins an entry leaf,
+        // the front-leaf rule must not assign a second entry to
+        // the big front leaf.
+        use crate::use_cases::programs::assign_programs_pinned;
+        let leaves = six_leaves();
+        let got = assign_programs_pinned(&leaves, 0, false, &[(0, Program::Entry)]);
+        assert_eq!(got[0], Program::Entry);
+        assert_eq!(got.iter().filter(|p| **p == Program::Entry).count(), 1);
+    }
+
+    #[test]
+    fn a_pinned_hall_is_the_only_hall_on_a_two_storey_floor() {
+        use crate::use_cases::programs::assign_programs_pinned;
+        let leaves = six_leaves();
+        let got = assign_programs_pinned(&leaves, 0, true, &[(0, Program::Hall)]);
+        assert_eq!(got[0], Program::Hall);
+        assert_eq!(got.iter().filter(|p| **p == Program::Hall).count(), 1);
     }
 
     #[test]

@@ -113,9 +113,14 @@ fn two_pins_carve_two_bath_leaves() {
     let mut rng = Rng::new(3);
     let rect = Rect::new(0.0, 0.0, 19.5, 11.3);
     let sub = subdivide_with_alcove(&mut rng, rect, 6, &[Program::Bath, Program::Bath]);
-    assert_eq!(sub.pins, vec![(0, Program::Bath), (2, Program::Bath)]);
-    assert_eq!(sub.leaves[0], Rect::new(0.0, 0.0, 2.4, 2.5));
-    assert_eq!(sub.leaves[2], Rect::new(2.4, 0.0, 2.4, 2.5));
+    // Two pins, each pointing at a 2.4 x 2.5 m bath leaf on the
+    // west edge. The indices are not fixed: ADR 0014 splits the
+    // strip remainder into aspect-valid pieces, so the first
+    // strip holds a bath leaf plus two pieces and the second
+    // pin sits at index 3, not 2.
+    assert_eq!(sub.pins.len(), 2);
+    assert_eq!(sub.leaves[sub.pins[0].0], Rect::new(0.0, 0.0, 2.4, 2.5));
+    assert_eq!(sub.leaves[sub.pins[1].0], Rect::new(2.4, 0.0, 2.4, 2.5));
     assert_eq!(sub.splits.len(), sub.leaves.len() - 1);
     let area: f64 = sub.leaves.iter().map(Rect::area).sum();
     assert!((area - rect.area()).abs() < 1e-6);
@@ -124,6 +129,22 @@ fn two_pins_carve_two_bath_leaves() {
             assert!(!a.overlaps(b), "leaves overlap: {a:?} {b:?}");
         }
         assert!(a.w >= MIN_SIDE - 1e-9 && a.d >= MIN_SIDE - 1e-9, "sliver: {a:?}");
+    }
+}
+
+#[test]
+fn two_strips_leave_the_rest_enough_habitable_leaves() {
+    // Seed 28 Cottage, round 2: two pins on an 8.7 x 7.5 m
+    // rect leave a 3.9 x 7.5 m rest (29.25 sq m). The strips
+    // yield only 6.0 sq m leaves, so the rest is the only
+    // source of habitable leaves — it must yield at least the
+    // three core rooms (Living, Kitchen, Bedroom).
+    let rect = Rect::new(0.0, 0.0, 8.7, 7.5);
+    for seed in 0..20u32 {
+        let mut rng = Rng::new(seed);
+        let sub = subdivide_with_alcove(&mut rng, rect, 4, &[Program::Bath, Program::Entry]);
+        let habitable = sub.leaves.iter().filter(|l| l.area() >= 6.5 - 1e-9).count();
+        assert!(habitable >= 3, "seed {seed}: only {habitable} habitable leaves");
     }
 }
 

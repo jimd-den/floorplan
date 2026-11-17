@@ -63,6 +63,54 @@ fn every_footprint_has_a_rect_that_admits_a_bath_alcove() {
 }
 
 #[test]
+fn wings_are_wide_enough_for_an_alcove_strip() {
+    // ADR 0015: a wing narrower than 4.8 m can neither hold an
+    // alcove strip (2.4 + 2.4 m) nor a foyer entry (3.6 x 2.4
+    // is 8.64 sq m, room-sized) — seeds 60 and 80. Wing
+    // widths are drawn from 4.8 m, not 3.0 m.
+    for shape in [FootprintShape::L, FootprintShape::U, FootprintShape::T] {
+        for seed in 0..200 {
+            let mut rng = Rng::new(seed);
+            for style in Style::all() {
+                let fp = footprint_with_shape(&mut rng, style, shape);
+                for wing in fp.rects.iter().skip(1) {
+                    assert!(
+                        wing.w >= 4.8 - 1e-9,
+                        "seed {seed} {style:?} {shape:?}: wing is {} m wide",
+                        wing.w
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn wing_depths_avoid_the_room_sized_strip_rest_range() {
+    // ADR 0015 (seed 116 Craftsman T): a 5.58 m stem leaves a
+    // 2.4 x 3.08 m strip rest (7.39 sq m) — room-sized, and
+    // unsplittable (3.08 < 4.8 m), so no southern leaf can be
+    // a foyer. A wing/stem depth in (5.208, 7.3) m leaves a
+    // strip rest in (2.708, 4.8) m: room-sized and
+    // unsplittable. Wing depths must stay out of that range.
+    for shape in [FootprintShape::L, FootprintShape::U, FootprintShape::T] {
+        for style in Style::all() {
+            for seed in 0..200u32 {
+                let mut rng = Rng::new(seed);
+                let fp = footprint_with_shape(&mut rng, style, shape);
+                for rect in fp.rects.iter().skip(1) {
+                    assert!(
+                        rect.d <= 5.208 + 1e-9 || rect.d >= 7.3 - 1e-9,
+                        "{shape:?} {style:?} seed {seed}: wing depth {:.2} m leaves a room-sized strip rest",
+                        rect.d
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn footprint_rects_never_overlap() {
     for seed in 0..50 {
         let mut rng = Rng::new(seed);

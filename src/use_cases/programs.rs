@@ -18,6 +18,7 @@
 use crate::domain::geometry::Rect;
 use crate::domain::model::Program;
 use crate::use_cases::ground::assign_ground;
+use crate::use_cases::habitable_floor::enforce_habitable_floor;
 use crate::use_cases::repair_window::repair_interior;
 use crate::use_cases::upper::assign_upper;
 
@@ -57,6 +58,8 @@ pub fn assign_programs_pinned(
     for &(i, p) in pins {
         out[i] = p;
     }
+    // ADR 0014: no habitable program on a sub-floor leaf.
+    enforce_habitable_floor(leaves, &mut out);
     out
 }
 

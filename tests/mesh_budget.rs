@@ -18,17 +18,24 @@ use floorplan::use_cases::neighborhood_mesh::neighborhood_mesh;
 /// trim fix (bands stop at doors, +24 boxes on Colonial) and the
 /// stem wall (a concrete foundation wall around the perimeter, +63
 /// boxes on Colonial) — Colonial, the largest house, is now
-/// 9196 vertices / 13724 faces.
+/// 9196 vertices / 13724 faces. It moved again for the room-size
+/// rules (ADR 0014): bath-sized strip pieces and hall/entry
+/// re-tiling add leaves, so Colonial grows to 9556 vertices /
+/// 14264 faces. It moved again for the BSP post-pass (ADR 0014):
+/// over-cap leaves are re-split into aspect-valid pieces, so
+/// Colonial grows to 10660 vertices / 15920 faces. The guard is
+/// a performance budget, not a shape rule; the increase buys
+/// rooms that pass the study.
 #[test]
 fn a_house_mesh_fits_the_first_person_budget() {
     for style in Style::all() {
         let mesh = extrude(&generate_house(42, style));
         assert!(
-            mesh.vertices.len() <= 9500,
+            mesh.vertices.len() <= 10_700,
             "{style:?}: {} vertices",
             mesh.vertices.len()
         );
-        assert!(mesh.faces.len() <= 14_200, "{style:?}: {} faces", mesh.faces.len());
+        assert!(mesh.faces.len() <= 16_000, "{style:?}: {} faces", mesh.faces.len());
     }
 }
 

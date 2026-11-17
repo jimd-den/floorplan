@@ -3,12 +3,14 @@
 //! The assignment reserves sub-cap leaves for baths (see
 //! `repair::assign_bed_bath`); this step splits an oversized bath
 //! or study leaf where the leaf allows it — a strip cut across the
-//! long side, the capped room keeping a 2.4 m strip, the remainder
-//! becoming dining or laundry. A leaf too small in one dimension to
+//! long side, the capped room keeping at least a 2.4 m strip (wider
+//! where the leaf is wide, so the kept piece keeps aspect <= 2.0),
+//! the remainder becoming dining or laundry. A leaf too small in one dimension to
 //! split without a sliver is left alone: a 6 sq m bath needs a
 //! 2.4 x 2.5 m room, and most leaves cannot host one (see ADR 0002).
 
 use crate::domain::model::{Program, Room};
+use crate::domain::room_size::meets_habitable_floor;
 use crate::use_cases::bsp::Split;
 use crate::use_cases::cap_cut::{pick_cut, strip_cuts};
 
@@ -34,7 +36,13 @@ pub fn cap_room_sizes(rooms: &mut Vec<Room>, splits: &mut Vec<Split>, next_room:
         let Some(cuts) = strip_cuts(&rooms[i].rect, cap) else { continue };
         let (small, remainder, split, ext) = pick_cut(rooms, i, &cuts);
         let has_dining = rooms.iter().any(|r| r.program == Program::Dining);
-        let program = if ext >= 1.2 && !has_dining { Program::Dining } else { Program::Laundry };
+        // ADR 0014: a sub-floor remainder cannot be Dining — Dining
+        // is habitable, and the floor is 6.5 sq m. It is Laundry.
+        let program = if ext >= 1.2 && !has_dining && meets_habitable_floor(&remainder) {
+            Program::Dining
+        } else {
+            Program::Laundry
+        };
         let id = *next_room;
         *next_room += 1;
         rooms[i].rect = small;
@@ -112,6 +120,34 @@ mod tests {
         cap_room_sizes(&mut rooms, &mut splits, &mut next_room);
         assert_eq!(rooms.len(), 2, "an uncarvable leaf must not split");
         assert!(splits.is_empty());
+    }
+
+    #[test]
+    fn a_sub_floor_remainder_becomes_laundry_not_dining() {
+        // A 2.5 x 4.9 m bath leaf strip-cuts to a 2.5 x 2.4 m bath
+        // and a 2.5 x 2.5 m remainder (6.25 sq m). The remainder
+        // has an exterior edge and there is no dining yet, so
+        // without the floor guard it would become Dining — but
+        // Dining is habitable and 6.25 sq m is below the floor.
+        let mut rooms = vec![
+            room(0, Program::Living, Rect::new(0.0, 0.0, 10.0, 8.0)),
+            room(1, Program::Bath, Rect::new(10.0, 0.0, 2.5, 4.9)),
+        ];
+        let mut splits = vec![];
+        let mut next_room = 2;
+        cap_room_sizes(&mut rooms, &mut splits, &mut next_room);
+        assert_eq!(rooms.len(), 3);
+        let remainder = rooms.iter().find(|r| r.id == 2).unwrap();
+        assert!(
+            remainder.rect.area() < 6.5,
+            "remainder is {} sq m",
+            remainder.rect.area()
+        );
+        assert_eq!(
+            remainder.program,
+            Program::Laundry,
+            "a sub-floor remainder cannot be Dining"
+        );
     }
 
     #[test]

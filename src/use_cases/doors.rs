@@ -5,7 +5,7 @@
 //! rooms they join (see `door_width`): a real house has at most
 //! one double door per floor, on its living/dining opening.
 
-use crate::domain::geometry::{Axis, Segment};
+use crate::domain::geometry::{Axis, Segment, shared_edge};
 use crate::domain::model::{Opening, OpeningKind, Program, Room};
 use crate::domain::skeleton::{Skeleton, SkeletonLink};
 use crate::frameworks_drivers::rng::Rng;
@@ -102,25 +102,96 @@ fn jitter(rng: &mut Rng, slack: f64) -> f64 {
     if slack > 0.0 { quant(rng.range_f64(-slack / 2.0, slack / 2.0)) } else { 0.0 }
 }
 
-/// The front door on the entry room's southern wall: a single
-/// 0.9 m door, whatever the front. A wide front does not make a
-/// wide front door.
+/// The front door on the entry room's southern wall when that
+/// wall faces outside — otherwise on the room's longest exterior
+/// stretch. A pinned entry is an alcove leaf on the west or
+/// north side, so its southern wall is interior; the door must
+/// not be cut into it. A 0.9 m door needs 1.5 m of exterior
+/// wall (0.3 m margins each side). No door when no edge has
+/// one — a fully interior entry has nowhere to put it.
 fn entry_door(rng: &mut Rng, rooms: &[Room], entry_room: u32, next_id: &mut u32) -> Option<Opening> {
     let room = rooms.iter().find(|r| r.id == entry_room)?;
-    let edge = Segment::new(room.rect.x, room.rect.bottom(), room.rect.right(), room.rect.bottom());
+    let edges = room.rect.edges();
+    let south = longest_part(&edges[2], rooms, room);
+    let edge = south.filter(|s| s.len() >= 1.5).or_else(|| {
+        edges
+            .iter()
+            .flat_map(|e| exterior_parts(e, rooms, room))
+            .max_by(|a, b| a.len().partial_cmp(&b.len()).unwrap())
+            .filter(|s| s.len() >= 1.5)
+    })?;
     let width = entry_door_width();
     let slack = (edge.len() - width - 0.6).max(0.0);
     let offset = jitter(rng, slack);
     let id = *next_id;
     *next_id += 1;
+    let (x, y, axis) = if edge.is_horizontal() {
+        ((edge.x1 + edge.x2) / 2.0 + offset, edge.y1, Axis::Horizontal)
+    } else {
+        (edge.x1, (edge.y1 + edge.y2) / 2.0 + offset, Axis::Vertical)
+    };
     Some(Opening {
         id,
         kind: OpeningKind::EntryDoor,
-        x: (edge.x1 + edge.x2) / 2.0 + offset,
-        y: edge.y1,
-        axis: Axis::Horizontal,
+        x,
+        y,
+        axis,
         width,
         from: entry_room,
         to: None,
     })
+}
+
+/// The longest exterior part of one edge, if any.
+fn longest_part(edge: &Segment, rooms: &[Room], room: &Room) -> Option<Segment> {
+    exterior_parts(edge, rooms, room)
+        .into_iter()
+        .max_by(|a, b| a.len().partial_cmp(&b.len()).unwrap())
+}
+
+/// The parts of `edge` not shared with any other room. The edge
+/// is axis-aligned; covered intervals are collected along it,
+/// sorted, merged, and the gaps are the exterior stretches.
+fn exterior_parts(edge: &Segment, rooms: &[Room], room: &Room) -> Vec<Segment> {
+    let horizontal = edge.is_horizontal();
+    let (lo, hi) = if horizontal {
+        (edge.x1.min(edge.x2), edge.x1.max(edge.x2))
+    } else {
+        (edge.y1.min(edge.y2), edge.y1.max(edge.y2))
+    };
+    let mut covered: Vec<(f64, f64)> = rooms
+        .iter()
+        .filter(|o| o.id != room.id)
+        .filter_map(|o| shared_edge(&room.rect, &o.rect))
+        .filter_map(|s| edge.overlap(&s))
+        .map(|o| {
+            if horizontal {
+                (o.x1.min(o.x2), o.x1.max(o.x2))
+            } else {
+                (o.y1.min(o.y2), o.y1.max(o.y2))
+            }
+        })
+        .collect();
+    covered.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
+    let mut parts = vec![];
+    let mut cur = lo;
+    for (a, b) in covered {
+        if a > cur + 1e-9 {
+            parts.push(part(edge, horizontal, cur, a));
+        }
+        cur = cur.max(b);
+    }
+    if hi > cur + 1e-9 {
+        parts.push(part(edge, horizontal, cur, hi));
+    }
+    parts
+}
+
+/// One exterior stretch along `edge`, from `a` to `b`.
+fn part(edge: &Segment, horizontal: bool, a: f64, b: f64) -> Segment {
+    if horizontal {
+        Segment::new(a, edge.y1, b, edge.y1)
+    } else {
+        Segment::new(edge.x1, a, edge.x1, b)
+    }
 }

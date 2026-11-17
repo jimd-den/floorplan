@@ -114,6 +114,16 @@ pub(crate) fn assign_bed_bath(
         out[u] = Program::Bedroom;
     }
     rest.retain(|i| !beds.contains(i));
+    // An unstudyable leftover the bath guard would not promote
+    // to a bedroom is laundry, not an over-cap study: it has no
+    // cap, so the floor keeps its bath ratio and no study exceeds
+    // 12 sq m (seed 6 Ranch: a 13.0 sq m wing the guard would not
+    // make a third bedroom).
+    for &u in &unstudyable {
+        if out[u] == Program::Study {
+            out[u] = Program::Laundry;
+        }
+    }
     // Baths prefer leaves the cap step can fix: a leaf that
     // already fits, or one a strip cut can carve to the cap. A
     // thin-rect leaf that fits neither is the last resort — it

@@ -34,6 +34,26 @@ pub fn footprint_with_shape(rng: &mut Rng, style: Style, shape: FootprintShape) 
     build_footprint(rng, style, shape)
 }
 
+/// A wing/stem depth that would leave a room-sized,
+/// unsplittable strip rest (ADR 0015): the rest is the depth
+/// minus the 2.5 m bath leaf, room-sized above 6.5 / 2.4 =
+/// 2.708 m and unsplittable below 2 x 2.4 = 4.8 m, so depths
+/// in (5.208, 7.3) m are forbidden. Moves the depth to the
+/// foyer-sized side (5.2 m) when that stays in [lo, hi], else
+/// to the splittable side (7.3 m), else leaves it.
+fn strip_safe_depth(depth: f64, lo: f64, hi: f64) -> f64 {
+    if depth <= 5.208 || depth >= 7.3 {
+        return depth;
+    }
+    if 5.2 >= lo && 5.2 <= hi {
+        5.2
+    } else if 7.3 >= lo && 7.3 <= hi {
+        7.3
+    } else {
+        depth
+    }
+}
+
 fn build_footprint(rng: &mut Rng, style: Style, shape: FootprintShape) -> Footprint {
     let spec = style.spec();
     let w = dim(rng, spec.width.0, spec.width.1);
@@ -41,8 +61,15 @@ fn build_footprint(rng: &mut Rng, style: Style, shape: FootprintShape) -> Footpr
     let (rects, mut joins) = match shape {
         FootprintShape::Rectangle => (vec![Rect::new(0.0, 0.0, w, d)], vec![]),
         FootprintShape::L => {
-            let ww = dim(rng, 3.0, (w * 0.5).min(w - 3.0));
-            let wd = dim(rng, 3.0, (d * 0.4).max(3.0));
+            // ADR 0015: wings are drawn from 4.8 m, not 3.0 m —
+            // a narrower wing can neither hold an alcove strip
+            // (2.4 + 2.4 m) nor a foyer entry.
+            let ww = dim(rng, 4.8, (w * 0.5).min(w - 3.0));
+            let wd = strip_safe_depth(
+                dim(rng, 3.0, (d * 0.4).max(3.0)),
+                3.0,
+                (d * 0.4).max(3.0),
+            );
             let main_d = d - wd;
             (
                 vec![Rect::new(0.0, 0.0, w, main_d), Rect::new(0.0, main_d, ww, wd)],
@@ -51,8 +78,9 @@ fn build_footprint(rng: &mut Rng, style: Style, shape: FootprintShape) -> Footpr
         }
         FootprintShape::U => {
             let d1 = dim(rng, d * 0.35, d * 0.6);
-            let ww1 = dim(rng, 3.0, (w * 0.3).max(3.0));
-            let ww2 = dim(rng, 3.0, (w * 0.3).max(3.0));
+            let d1 = d - strip_safe_depth(d - d1, d * 0.4, d * 0.65);
+            let ww1 = dim(rng, 4.8, (w * 0.3).max(3.0));
+            let ww2 = dim(rng, 4.8, (w * 0.3).max(3.0));
             (
                 vec![
                     Rect::new(0.0, 0.0, w, d1),
@@ -67,7 +95,8 @@ fn build_footprint(rng: &mut Rng, style: Style, shape: FootprintShape) -> Footpr
         }
         FootprintShape::T => {
             let d1 = dim(rng, d * 0.4, d * 0.6);
-            let sw = dim(rng, 3.0, w * 0.5);
+            let d1 = d - strip_safe_depth(d - d1, d * 0.4, d * 0.6);
+            let sw = dim(rng, 4.8, w * 0.5);
             let sx = quant((w - sw) / 2.0);
             (
                 vec![Rect::new(0.0, 0.0, w, d1), Rect::new(sx, d1, sw, d - d1)],

@@ -1,7 +1,7 @@
 //! Doors: one per backbone link, the entry door, and the rule that
 //! a floor has at most one double door, on its living/dining opening.
 
-use floorplan::domain::geometry::{Rect, shared_edge};
+use floorplan::domain::geometry::{Axis, Rect, shared_edge};
 use floorplan::domain::model::{OpeningKind, Program, Room};
 use floorplan::domain::skeleton::Skeleton;
 use floorplan::frameworks_drivers::rng::Rng;
@@ -118,4 +118,44 @@ fn every_room_is_reachable_from_the_entry() {
         }
     }
     assert_eq!(seen.len(), rooms.len(), "unreachable rooms remain");
+}
+
+#[test]
+fn the_front_door_avoids_an_interior_south_wall() {
+    // ADR 0014: an alcove entry on the west side has its south
+    // wall shared with the room below, so the door goes on the
+    // west wall (the longest exterior stretch, 2.5 m).
+    let rooms = vec![
+        room(0, Program::Entry, Rect::new(0.0, 0.0, 2.4, 2.5)),
+        room(1, Program::Study, Rect::new(0.0, 2.5, 2.4, 5.0)),
+        room(2, Program::Living, Rect::new(2.4, 0.0, 5.0, 2.5)),
+    ];
+    let skeleton = Skeleton::default();
+    let mut rng = Rng::new(1);
+    let doors = place_doors(&mut rng, &rooms, &skeleton, 0);
+    let door = doors
+        .iter()
+        .find(|d| d.kind == OpeningKind::EntryDoor)
+        .expect("a front door is expected");
+    assert_eq!(door.axis, Axis::Vertical);
+    assert!((door.x - 0.0).abs() < 1e-9, "the door is on the west wall, x={}", door.x);
+}
+
+#[test]
+fn the_front_door_prefers_the_south_wall_when_it_faces_outside() {
+    // A normal entry on the front: the south wall is exterior
+    // and longest, so the door stays there.
+    let rooms = vec![
+        room(0, Program::Entry, Rect::new(5.0, 6.0, 4.0, 3.0)),
+        room(1, Program::Living, Rect::new(5.0, 0.0, 4.0, 6.0)),
+    ];
+    let skeleton = Skeleton::default();
+    let mut rng = Rng::new(1);
+    let doors = place_doors(&mut rng, &rooms, &skeleton, 0);
+    let door = doors
+        .iter()
+        .find(|d| d.kind == OpeningKind::EntryDoor)
+        .expect("a front door is expected");
+    assert_eq!(door.axis, Axis::Horizontal);
+    assert!((door.y - 9.0).abs() < 1e-9, "the door is on the south wall, y={}", door.y);
 }
