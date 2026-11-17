@@ -1,6 +1,5 @@
 //! Viewing scenes: a mesh plus the ground it stands on.
 
-use floorplan::domain::mesh::Mesh;
 use floorplan::domain::style::Style;
 use floorplan::use_cases::extrude::extrude;
 use floorplan::use_cases::generate::generate_house;
@@ -10,10 +9,6 @@ use floorplan::use_cases::scene::{house_scene, neighborhood_scene};
 
 fn house() -> floorplan::domain::model::House {
     generate_house(42, Style::Modern)
-}
-
-fn lowest(mesh: &Mesh) -> f32 {
-    mesh.vertices.iter().map(|v| v[1]).fold(f32::INFINITY, f32::min)
 }
 
 #[test]
@@ -29,10 +24,19 @@ fn a_house_scene_adds_one_ground_box_and_one_material() {
 
 #[test]
 fn the_house_ground_lies_below_the_floor_slab() {
-    let scene = house_scene(&house());
-
-    assert!(lowest(&scene) <= -0.02, "the lawn must sit below the floor");
-    assert!(lowest(&scene) > -0.5, "the lawn must not be a pit");
+    // The lawn is the last box added (8 vertices): it must sit
+    // below the floor slab, and stay shallow — not a pit. The
+    // house itself now reaches the basement floor, deeper still,
+    // so the lawn is measured on its own, not via the whole scene.
+    let h = house();
+    let bare = extrude(&h);
+    let scene = house_scene(&h);
+    let lawn = &scene.vertices[bare.vertices.len()..];
+    assert_eq!(lawn.len(), 8, "one ground box of vertices");
+    let low = lawn.iter().map(|v| v[1]).fold(f32::INFINITY, f32::min);
+    let high = lawn.iter().map(|v| v[1]).fold(f32::NEG_INFINITY, f32::max);
+    assert!(high <= -0.02, "the lawn must sit below the floor");
+    assert!(low > -0.5, "the lawn must not be a pit");
 }
 
 #[test]

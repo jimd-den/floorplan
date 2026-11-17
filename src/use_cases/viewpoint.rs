@@ -8,13 +8,15 @@
 use crate::domain::model::{House, Program};
 use crate::domain::neighborhood::Neighborhood;
 use crate::domain::placement::house_extent;
+use crate::use_cases::basement_pose::basement_pose;
 
-/// The three views the screenshot adapter can frame.
+/// The four views the screenshot adapter can frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum View {
     Exterior,
     Interior,
     Street,
+    Basement,
 }
 
 impl View {
@@ -24,6 +26,7 @@ impl View {
             View::Exterior => "exterior",
             View::Interior => "interior",
             View::Street => "street",
+            View::Basement => "basement",
         }
     }
 }
@@ -40,6 +43,7 @@ pub struct Pose {
 pub fn house_pose(house: &House, view: View) -> Pose {
     match view {
         View::Interior => interior_pose(house),
+        View::Basement => basement_pose(house),
         _ => exterior_pose(house),
     }
 }

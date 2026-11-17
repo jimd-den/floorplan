@@ -119,3 +119,53 @@ fn the_street_pose_stands_on_a_street_and_looks_along_it() {
         "must look along the street"
     );
 }
+
+#[test]
+fn the_basement_stands_in_the_basement_and_looks_at_the_stair() {
+    for seed in [0u32, 7, 42, 106] {
+        for style in Style::all() {
+            let house = generate_house(seed, style);
+            let b = &house.basement;
+            let Pose { eye, target } = house_pose(&house, View::Basement);
+            let floor_y = -(b.depth as f32);
+            // The eye stands in the basement, at standing height
+            // above its floor.
+            assert!(inside(b.rect, eye), "seed {seed} {style:?}: eye outside the basement");
+            assert!(
+                (eye[1] - (floor_y + 1.7)).abs() < 0.01,
+                "seed {seed} {style:?}: eye at {eye:?}, not 1.7 m above the basement floor"
+            );
+            // The eye stands off the stair's axis, so the stepped
+            // profile reads instead of the flat end.
+            let (sx, sz) = b.stair_top;
+            let off_axis = match b.stair_axis {
+                floorplan::domain::geometry::Axis::Horizontal => (eye[2] as f64 - sz).abs(),
+                floorplan::domain::geometry::Axis::Vertical => (eye[0] as f64 - sx).abs(),
+            };
+            assert!(
+                off_axis >= 1.0,
+                "seed {seed} {style:?}: eye {eye:?} is on the stair axis, not to the side"
+            );
+            // The target is the stair coming down: in plan it sits
+            // on the stair run, and its height is between the
+            // basement floor and grade.
+            let (tx, tz) = (target[0] as f64, target[2] as f64);
+            let (sx, sz) = b.stair_top;
+            let on_run = match b.stair_axis {
+                floorplan::domain::geometry::Axis::Horizontal => {
+                    tx >= sx - 0.01 && tx <= sx + b.stair_run + 0.01 && (tz - sz).abs() < 0.6
+                }
+                floorplan::domain::geometry::Axis::Vertical => {
+                    tz >= sz - 0.01 && tz <= sz + b.stair_run + 0.01 && (tx - sx).abs() < 0.6
+                }
+            };
+            assert!(on_run, "seed {seed} {style:?}: target {target:?} is not on the stair");
+            assert!(
+                target[1] > floor_y && target[1] < 0.0,
+                "seed {seed} {style:?}: target height {} not between floor and grade",
+                target[1]
+            );
+            assert_ne!(eye, target);
+        }
+    }
+}

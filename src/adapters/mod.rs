@@ -7,6 +7,7 @@ pub mod cli_parse;
 pub mod cli_parse_neighborhood;
 pub mod cli_parse_render;
 pub mod cli_render;
+pub mod framing_json;
 pub mod gltf;
 pub mod haunt_json;
 pub mod json;

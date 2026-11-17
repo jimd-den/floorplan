@@ -11,20 +11,24 @@ use floorplan::use_cases::neighborhood::generate_neighborhood;
 use floorplan::use_cases::neighborhood_mesh::neighborhood_mesh;
 
 /// One house, every style. A house is drawn alone, so it gets the
-/// tighter budget: ~8.5k vertices and ~13k triangles. The M6 realism
-/// pass (pitched roof, siding, frames, baseboards, mouldings, relief,
-/// painted linings) spends geometry on reads-as-a-house; the guard
-/// moved with it.
+/// tighter budget: ~9.5k vertices and ~14.2k triangles. The M6
+/// realism pass (pitched roof, siding, frames, baseboards, mouldings,
+/// relief, painted linings) spends geometry on reads-as-a-house; the
+/// guard moved with it. It moved again twice for correctness: the
+/// trim fix (bands stop at doors, +24 boxes on Colonial) and the
+/// stem wall (a concrete foundation wall around the perimeter, +63
+/// boxes on Colonial) — Colonial, the largest house, is now
+/// 9196 vertices / 13724 faces.
 #[test]
 fn a_house_mesh_fits_the_first_person_budget() {
     for style in Style::all() {
         let mesh = extrude(&generate_house(42, style));
         assert!(
-            mesh.vertices.len() <= 8500,
+            mesh.vertices.len() <= 9500,
             "{style:?}: {} vertices",
             mesh.vertices.len()
         );
-        assert!(mesh.faces.len() <= 13_000, "{style:?}: {} faces", mesh.faces.len());
+        assert!(mesh.faces.len() <= 14_200, "{style:?}: {} faces", mesh.faces.len());
     }
 }
 

@@ -3,6 +3,8 @@
 //! -> windows. `generate` wires them together.
 
 pub mod alcove;
+pub mod basement_mesh;
+pub mod basement_pose;
 pub mod bsp;
 pub mod cap_cut;
 pub mod caps;
@@ -12,6 +14,8 @@ pub mod distribute;
 pub mod door_panel;
 pub mod extrude;
 pub mod floor;
+pub mod framing;
+pub mod framing_mesh;
 pub mod furnish_clear;
 pub mod ground;
 pub mod haunt;
@@ -35,6 +39,7 @@ pub mod road_signs;
 pub mod ribbon;
 pub mod roof;
 pub mod roof_detail;
+pub mod roof_frame;
 pub mod scene;
 pub mod skeleton;
 pub mod stairs;
@@ -46,6 +51,7 @@ pub mod traverse;
 pub mod doors;
 pub mod door_width;
 pub mod footprint;
+pub mod foundation;
 pub mod garage;
 pub mod generate;
 pub mod grounds;
@@ -68,7 +74,6 @@ pub mod windows;
 
 /// Quantizes a metre value to 0.1 m. Every seeded dimension in the
 /// generator goes through this, so plans stay readable and the variety
-/// count can be computed from finite decision sets.
-pub fn quant(v: f64) -> f64 {
-    (v * 10.0).round() / 10.0
-}
+/// count can be computed from finite decision sets. Defined in the
+/// domain (`domain::geometry`); re-exported here for the use cases.
+pub use crate::domain::geometry::quant;

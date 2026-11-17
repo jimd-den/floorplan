@@ -1,9 +1,10 @@
-//! Porch: the front slab, two steps, two posts, and a small roof.
+//! Porch: the front deck, two posts, and a small roof.
 //!
 //! The porch is part of the footprint in the house's local frame, so
 //! the whole assembly rotates with the house when the neighborhood
 //! places it. The porch roof sits below the main eave, which is what
-//! makes a front door read as a front door.
+//! makes a front door read as a front door. The deck is at grade, so
+//! it takes no steps: steps below grade would be buried, not built.
 
 use crate::domain::mesh::{Box3, Mesh};
 use crate::domain::model::{House, Program};
@@ -21,7 +22,6 @@ pub fn add_porch(mesh: &mut Mesh, house: &House) {
     let Some(p) = house.footprint.porch else { return };
     let (x0, z0, x1, z1) = (p.x as f32, p.y as f32, p.right() as f32, p.bottom() as f32);
     mesh.add_box(Box3::new([x0, -0.12, z0], [x1, 0.0, z1]), PORCH);
-    add_steps(mesh, x0, x1, z1);
     for x in [x0 + 0.1, x1 - 0.1 - POST] {
         mesh.add_box(Box3::new([x, 0.0, z1 - 0.1 - POST], [x + POST, ROOF_Y, z1 - 0.1]), TRIM);
     }
@@ -51,17 +51,6 @@ pub fn add_garage_door(mesh: &mut Mesh, house: &House) {
     );
 }
 
-/// Two steps south of the slab, each 0.3 m deep.
-fn add_steps(mesh: &mut Mesh, x0: f32, x1: f32, z1: f32) {
-    let width = (x1 - x0).min(3.0);
-    let sx = (x0 + x1) / 2.0 - width / 2.0;
-    for i in 0..2 {
-        let top = -0.04 - i as f32 * 0.04;
-        let za = z1 + i as f32 * 0.3;
-        mesh.add_box(Box3::new([sx, -0.12, za], [sx + width, top, za + 0.3]), PORCH);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -82,13 +71,18 @@ mod tests {
     }
 
     #[test]
-    fn a_porch_gets_steps_posts_and_a_roof() {
+    fn a_porch_gets_a_deck_posts_and_a_roof_and_no_buried_steps() {
         let house = house_with_porch();
         let mut mesh = Mesh::new(material_table());
         add_porch(&mut mesh, &house);
-        assert!(mesh.materials.contains(&PORCH), "no porch slab or steps");
+        assert!(mesh.materials.contains(&PORCH), "no porch deck");
         assert!(mesh.materials.contains(&TRIM), "no porch posts");
         assert!(mesh.materials.contains(&ROOF), "no porch roof");
+        // Every porch box sits at or above grade: nothing buried.
+        assert!(
+            mesh.vertices.iter().all(|v| v[1] >= -0.12),
+            "a porch box is buried below its slab"
+        );
     }
 
     #[test]

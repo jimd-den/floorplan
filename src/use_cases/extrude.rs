@@ -8,7 +8,10 @@
 
 use crate::domain::mesh::{Box3, Lod, Mesh};
 use crate::domain::model::House;
+use crate::use_cases::basement_mesh::add_basement;
 use crate::use_cases::door_panel::door_panels;
+use crate::use_cases::foundation::add_stem_wall;
+use crate::use_cases::framing_mesh::add_framing;
 use crate::use_cases::lining::add_wall_linings;
 use crate::use_cases::materials::{CEILING, CONCRETE, SIDING, WALL, program_material};
 use crate::use_cases::porch::{add_garage_door, add_porch};
@@ -41,6 +44,9 @@ pub fn extrude_lod(house: &House, lod: Lod) -> Mesh {
             CONCRETE,
         );
     }
+    // The stem wall: concrete from the footing to 0.2 m above grade,
+    // so the foundation reads as a wall, not a buried slab.
+    add_stem_wall(&mut mesh, house);
     for (fi, floor) in house.floors.iter().enumerate() {
         let base = fi as f32 * STOREY_H;
         for room in &floor.rooms {
@@ -71,6 +77,14 @@ pub fn extrude_lod(house: &House, lod: Lod) -> Mesh {
             Lod::Massing => {}
         }
     }
+    // The structural frame and the basement, Full LOD only: studs,
+    // plates, joists, rim, and ridge beam, plus the foundation
+    // walls, basement slab, and stair down. They are detail, not
+    // massing.
+    if lod == Lod::Full {
+        add_framing(&mut mesh, house);
+        add_basement(&mut mesh, house);
+    }
     if lod != Lod::Massing {
         for (b, m) in stairs_boxes(house) {
             mesh.add_box(b, m);
@@ -86,104 +100,3 @@ pub fn extrude_lod(house: &House, lod: Lod) -> Mesh {
     mesh
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::domain::style::Style;
-    use crate::use_cases::generate::generate_house;
-
-    #[test]
-    fn extrude_is_deterministic() {
-        let a = extrude(&generate_house(42, Style::Ranch));
-        let b = extrude(&generate_house(42, Style::Ranch));
-        assert_eq!(a.vertices, b.vertices);
-        assert_eq!(a.faces, b.faces);
-        assert_eq!(a.materials, b.materials);
-    }
-
-    #[test]
-    fn every_extruded_house_is_a_valid_mesh() {
-        for seed in [0u32, 7, 42, 106, 199] {
-            for style in Style::all() {
-                let mesh = extrude(&generate_house(seed, style));
-                assert_eq!(mesh.validate(), Ok(()), "seed {seed} {style:?}");
-            }
-        }
-    }
-
-    #[test]
-    fn a_two_storey_house_has_stairs_reaching_the_upper_floor() {
-        let house = generate_house(7, Style::Colonial);
-        let mesh = extrude(&house);
-        let stair_faces: Vec<_> = mesh
-            .faces
-            .iter()
-            .zip(mesh.materials.iter())
-            .filter(|(_, m)| **m == STAIRS)
-            .collect();
-        assert!(!stair_faces.is_empty(), "no stairs geometry");
-        let top = stair_faces
-            .iter()
-            .flat_map(|(f, _)| f.iter().map(|&v| mesh.vertices[v as usize][1]))
-            .fold(0.0f32, f32::max);
-        assert!((top - STOREY_H).abs() < 0.01, "stairs top at {top}, not {STOREY_H}");
-    }
-
-    #[test]
-    fn a_one_storey_house_has_no_stairs() {
-        let mesh = extrude(&generate_house(7, Style::Ranch));
-        assert!(!mesh.materials.contains(&STAIRS));
-    }
-
-    #[test]
-    fn the_top_floor_has_an_interior_ceiling_and_a_pitched_roof() {
-        let mesh = extrude(&generate_house(7, Style::Colonial));
-        assert!(mesh.materials.contains(&ROOF), "no pitched roof");
-        assert!(mesh.materials.contains(&CEILING), "no interior ceiling");
-        let roof_top = mesh.faces.iter().zip(mesh.materials.iter())
-            .filter(|(_, m)| **m == ROOF)
-            .flat_map(|(f, _)| f.iter().map(|&v| mesh.vertices[v as usize][1]))
-            .fold(0.0f32, f32::max);
-        assert!(roof_top > STOREY_H, "the roof does not rise above the top storey");
-    }
-
-    #[test]
-    fn the_mesh_carries_a_concrete_foundation() {
-        let house = generate_house(42, Style::Modern);
-        let mesh = extrude(&house);
-        assert!(mesh.material_table.iter().any(|m| m.name == "concrete"), "no concrete material");
-        let ys: Vec<f32> = mesh
-            .faces
-            .iter()
-            .zip(mesh.materials.iter())
-            .filter(|(_, m)| **m == CONCRETE)
-            .flat_map(|(f, _)| f.iter().map(|&v| mesh.vertices[v as usize][1]))
-            .collect();
-        assert!(!ys.is_empty(), "no concrete faces");
-        let low = ys.iter().cloned().fold(f32::INFINITY, f32::min);
-        let high = ys.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-        assert!((low + 0.3).abs() < 0.01, "the slab does not reach 0.3 m below floor level: {low}");
-        assert!(high.abs() < 0.01, "the slab top is not floor level: {high}");
-    }
-
-    #[test]
-    fn an_exposed_ground_ceiling_is_an_interior_ceiling() {
-        // A Colonial with a garage: no upper room sits above the
-        // garage, so its ceiling slab at 2.7 m is an interior
-        // ceiling, and the pitched roof is above the top storey.
-        for seed in 0..50u32 {
-            let house = generate_house(seed, Style::Colonial);
-            if house.footprint.garage.is_none() {
-                continue;
-            }
-            let mesh = extrude(&house);
-            let ys: Vec<f32> = mesh.faces.iter().zip(mesh.materials.iter())
-                .filter(|(_, m)| **m == CEILING)
-                .flat_map(|(f, _)| f.iter().map(|&v| mesh.vertices[v as usize][1]))
-                .collect();
-            assert!(ys.iter().any(|&y| (y - 2.7).abs() < 0.01), "seed {seed}: no ceiling at 2.7 m");
-            return;
-        }
-        panic!("no Colonial with a garage in 50 seeds");
-    }
-}

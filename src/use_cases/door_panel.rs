@@ -6,6 +6,7 @@
 
 use crate::domain::mesh::{Box3, Material};
 use crate::domain::model::{Floor, Opening, OpeningKind};
+use crate::use_cases::door_width::is_double_door;
 
 /// Material id for a door panel (after the furniture materials).
 pub const DOOR: u32 = 28;
@@ -18,9 +19,6 @@ pub fn door_material() -> Material {
 const DOOR_H: f32 = 2.0;
 /// Panel thickness in metres.
 const THICK: f32 = 0.05;
-/// A door at or above this width is two leaves, each hinged at its
-/// outer end. A single leaf wider than 1.4 m would be unwieldy.
-const DOUBLE_PANEL_AT: f32 = 1.4;
 
 /// The panel box for every door on a floor, at `base` height.
 /// A double door contributes two leaves.
@@ -39,10 +37,11 @@ pub fn door_panels(floor: &Floor, base: f32) -> Vec<(Box3, u32)> {
 }
 
 /// The leaf boxes for one door: one leaf, or two when the door is
-/// a double door. Each leaf hinges at its outer end.
+/// a double door (see `is_double_door`). Each leaf hinges at its
+/// outer end.
 fn panel_boxes(floor: &Floor, o: &Opening, base: f32, open: bool) -> Vec<Box3> {
     let w = o.width as f32;
-    if w < DOUBLE_PANEL_AT {
+    if !is_double_door(w as f64) {
         return vec![panel_box(floor, o, base, open, -w / 2.0, w / 2.0, true)];
     }
     vec![
@@ -169,25 +168,25 @@ mod tests {
 
     #[test]
     fn a_double_door_has_two_panels() {
-        let panels = door_panels(&floor_with_width(false, 1.6), 0.0);
-        assert_eq!(panels.len(), 2, "a 1.6 m door is two leaves");
+        let panels = door_panels(&floor_with_width(false, 1.2), 0.0);
+        assert_eq!(panels.len(), 2, "a 1.2 m door is two leaves");
         let (a, _) = panels[0];
         let (b, _) = panels[1];
         // Closed, the two leaves together span the opening.
         let span = (b.max[0] - a.min[0]).max(b.max[2] - a.min[2]);
-        assert!((span - 1.6).abs() < 1e-6, "two leaves should span 1.6 m: {a:?} {b:?}");
-        assert!((a.max[0] - a.min[0] - 0.8).abs() < 1e-6, "each leaf is 0.8 m: {a:?}");
-        assert!((b.max[0] - b.min[0] - 0.8).abs() < 1e-6, "each leaf is 0.8 m: {b:?}");
+        assert!((span - 1.2).abs() < 1e-6, "two leaves should span 1.2 m: {a:?} {b:?}");
+        assert!((a.max[0] - a.min[0] - 0.6).abs() < 1e-6, "each leaf is 0.6 m: {a:?}");
+        assert!((b.max[0] - b.min[0] - 0.6).abs() < 1e-6, "each leaf is 0.6 m: {b:?}");
     }
 
     #[test]
     fn an_open_double_door_swings_both_leaves() {
-        let panels = door_panels(&floor_with_width(true, 1.6), 0.0);
+        let panels = door_panels(&floor_with_width(true, 1.2), 0.0);
         assert_eq!(panels.len(), 2, "an open double door is still two leaves");
         for (b, _) in &panels {
             // Perpendicular: thin along the wall, reaching into the room.
             assert!((b.max[0] - b.min[0] - 0.05).abs() < 1e-6, "open leaf should be thin: {b:?}");
-            assert!((b.max[2] - b.min[2] - 0.8).abs() < 1e-6, "open leaf should reach 0.8 m in: {b:?}");
+            assert!((b.max[2] - b.min[2] - 0.6).abs() < 1e-6, "open leaf should reach 0.6 m in: {b:?}");
         }
     }
 }

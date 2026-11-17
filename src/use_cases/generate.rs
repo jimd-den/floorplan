@@ -3,11 +3,13 @@
 //! re-tiles until no room exceeds its program cap.
 
 use crate::domain::base::Base;
+use crate::domain::basement::Basement;
 use crate::domain::model::{Floor, House, Program};
 use crate::domain::style::Style;
 use crate::frameworks_drivers::rng::Rng;
 use crate::use_cases::floor::{build_floor_retiled, upper_rects};
 use crate::use_cases::footprint::footprint;
+use crate::use_cases::framing::build_framing;
 
 /// Builds a whole house from a seed and a style. Base first: the
 /// foundation slab is laid before any room, and every floor is
@@ -48,11 +50,26 @@ pub fn generate_house(seed: u32, style: Style) -> House {
     // No furnishing step: houses are generated empty, and the rooms
     // stay traversable. Furniture kinds remain in the domain for
     // interactions and tasks, which operate on empty lists.
+    // The frame is built from the finished floors and footprint:
+    // walls, doors, and windows attach to it.
+    let framing = build_framing(&floors, &fp, style, seed);
+    // The basement is dug under the main rect, with its stair down
+    // from the ground-floor hall.
+    let hall_id = hall_or_living(&floors[0]);
+    let hall_center = floors[0]
+        .rooms
+        .iter()
+        .find(|r| r.id == hall_id)
+        .map(|r| (r.rect.x + r.rect.w / 2.0, r.rect.y + r.rect.d / 2.0))
+        .unwrap_or((fp.rects[0].x, fp.rects[0].y));
+    let basement = Basement::from_footprint(&fp, seed, hall_id, hall_center);
     with_lights(House {
         seed,
         style,
         footprint: fp,
         base,
+        basement,
+        framing,
         floors,
         stairs,
         lights: Vec::new(),

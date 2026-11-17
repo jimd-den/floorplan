@@ -9,7 +9,7 @@ use crate::domain::geometry::Axis;
 use crate::domain::mesh::{Box3, Mesh};
 use crate::domain::model::{Floor, Opening, OpeningKind, Program};
 use crate::use_cases::materials::{BASEBOARD, DOOR_FRAME, GLASS, WINDOW_FRAME};
-use crate::use_cases::walls::{DOOR_H, WALL_T, WIN_SILL, WIN_TOP};
+use crate::use_cases::walls::{DOOR_H, WALL_T, WIN_SILL, WIN_TOP, openings_on};
 
 /// The width of a frame member, in metres.
 const FRAME: f32 = 0.06;
@@ -96,6 +96,18 @@ fn add_door_frame(mesh: &mut Mesh, o: &Opening, base: f32) {
 /// the principal rooms (living, dining, entry), on the inner face of
 /// each wall.
 fn add_baseboards(mesh: &mut Mesh, floor: &Floor, base: f32) {
+    for (b, m) in baseboard_boxes(floor, base) {
+        mesh.add_box(b, m);
+    }
+}
+
+/// The baseboard, chair rail, and crown boxes for a floor: one box
+/// per band per room edge, on the inner face of each wall. A band
+/// that would cross a door — baseboard and chair rail, both below
+/// the 2.1 m door head — stops at the door and resumes past it;
+/// the crown, above the head, runs continuously over the door.
+pub fn baseboard_boxes(floor: &Floor, base: f32) -> Vec<(Box3, u32)> {
+    let mut out = vec![];
     for room in &floor.rooms {
         let r = room.rect;
         let (x0, z0, x1, z1) = (r.x as f32, r.y as f32, r.right() as f32, r.bottom() as f32);
@@ -104,16 +116,48 @@ fn add_baseboards(mesh: &mut Mesh, floor: &Floor, base: f32) {
         } else {
             &[(base, base + BASE_H)]
         };
-        for &(a, b) in bands {
-            let members = [
-                Box3::new([x0, a, z0 + BASE_IN], [x1, b, z0 + BASE_IN + BASE_T]),
-                Box3::new([x0, a, z1 - BASE_IN - BASE_T], [x1, b, z1 - BASE_IN]),
-                Box3::new([x0 + BASE_IN, a, z0], [x0 + BASE_IN + BASE_T, b, z1]),
-                Box3::new([x1 - BASE_IN - BASE_T, a, z0], [x1 - BASE_IN, b, z1]),
-            ];
-            for m in members {
-                mesh.add_box(m, BASEBOARD);
+        for (i, edge) in r.edges().iter().enumerate() {
+            let doors: Vec<(f64, f64)> = openings_on(&floor.openings, edge)
+                .into_iter()
+                .filter(|(_, _, kind)| matches!(kind, OpeningKind::Door | OpeningKind::EntryDoor))
+                .map(|(a, b, _)| (a, b))
+                .collect();
+            let (lo, hi) = if edge.is_horizontal() { (edge.x1, edge.x2) } else { (edge.y1, edge.y2) };
+            for &(a, b) in bands {
+                let pieces = if a < base + DOOR_H && b > base {
+                    band_pieces(lo, hi, &doors)
+                } else {
+                    vec![(lo, hi)]
+                };
+                for (p, q) in pieces {
+                    let (p, q) = (p as f32, q as f32);
+                    let m = match i {
+                        0 => Box3::new([p, a, z0 + BASE_IN], [q, b, z0 + BASE_IN + BASE_T]),
+                        2 => Box3::new([p, a, z1 - BASE_IN - BASE_T], [q, b, z1 - BASE_IN]),
+                        3 => Box3::new([x0 + BASE_IN, a, p], [x0 + BASE_IN + BASE_T, b, q]),
+                        _ => Box3::new([x1 - BASE_IN - BASE_T, a, p], [x1 - BASE_IN, b, q]),
+                    };
+                    out.push((m, BASEBOARD));
+                }
             }
         }
     }
+    out
+}
+
+/// Splits the interval [lo, hi] at the door spans, returning the
+/// runs of wall between doors. Spans arrive sorted by start.
+fn band_pieces(lo: f64, hi: f64, doors: &[(f64, f64)]) -> Vec<(f64, f64)> {
+    let mut out = vec![];
+    let mut cursor = lo;
+    for &(a, b) in doors {
+        if a > cursor + 1e-9 {
+            out.push((cursor, a));
+        }
+        cursor = b.max(cursor);
+    }
+    if hi > cursor + 1e-9 {
+        out.push((cursor, hi));
+    }
+    out
 }

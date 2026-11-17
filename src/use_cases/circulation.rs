@@ -44,7 +44,7 @@ pub(crate) fn extras(
                 && pair.segment.len() >= 0.6
                 && rng.chance(0.5)
             {
-                extra.push(make_door(rng, pair, next_id));
+                extra.push(make_door(rng, pair, rooms, false, next_id));
             }
         }
     }

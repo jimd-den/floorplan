@@ -1,7 +1,7 @@
 //! CLI parsing for the render command.
 //!
 //! `floorplan render --seed <u32> [--style <name>] [--view exterior|
-//! interior|street] [--blocks WxH] [--out <path.png>]`
+//! interior|street|basement] [--blocks WxH] [--out <path.png>]`
 
 use crate::adapters::cli::Command;
 use crate::adapters::cli_parse::{style_list, value};
@@ -53,13 +53,16 @@ pub fn parse_render(rest: Vec<&String>) -> Result<Command, String> {
     Ok(Command::Render { seed, style, view, blocks, out })
 }
 
-/// Parses the view name. An unknown name lists the three.
+/// Parses the view name. An unknown name lists the four.
 fn parse_view(v: &str) -> Result<View, String> {
     match v {
         "exterior" => Ok(View::Exterior),
         "interior" => Ok(View::Interior),
         "street" => Ok(View::Street),
-        other => Err(format!("unknown view: {other} (views: exterior, interior, street)")),
+        "basement" => Ok(View::Basement),
+        other => Err(format!(
+            "unknown view: {other} (views: exterior, interior, street, basement)"
+        )),
     }
 }
 
@@ -119,10 +122,11 @@ mod tests {
     }
 
     #[test]
-    fn the_view_parser_names_all_three_views() {
+    fn the_view_parser_names_all_four_views() {
         assert_eq!(parse_view("exterior").unwrap(), View::Exterior);
         assert_eq!(parse_view("interior").unwrap(), View::Interior);
         assert_eq!(parse_view("street").unwrap(), View::Street);
+        assert_eq!(parse_view("basement").unwrap(), View::Basement);
         assert!(parse_view("attic").is_err());
     }
 }

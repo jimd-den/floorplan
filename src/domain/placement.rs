@@ -91,6 +91,13 @@ mod tests {
             style: Style::Colonial,
             footprint: footprint.clone(),
             base: crate::domain::base::Base::from_footprint(&footprint),
+            basement: crate::domain::basement::Basement::from_footprint(
+                &footprint,
+                42,
+                0,
+                (0.0, 0.0),
+            ),
+            framing: crate::domain::framing::Framing::default(),
             floors: Vec::new(),
             stairs: None,
             lights: Vec::new(),

@@ -1,6 +1,8 @@
 //! The plan model: House, Floor, Room, Opening, Style. Pure data, no I/O.
 
 use crate::domain::base::Base;
+use crate::domain::basement::Basement;
+use crate::domain::framing::Framing;
 use crate::domain::geometry::{Rect, Segment};
 use crate::domain::light::LightSource;
 use crate::domain::skeleton::Skeleton;
@@ -136,6 +138,15 @@ pub struct House {
     /// The foundation slab, built before any room. Its top is floor
     /// level; the walls and floors sit on it.
     pub base: Base,
+    /// The basement below grade: foundation walls, floor slab, and
+    /// the stair down from the ground-floor hall. Every house has
+    /// one; its rect is the main footprint rect.
+    pub basement: Basement,
+    /// The structural frame: wall framing, floor framing, roof
+    /// framing. This is the skeleton — the load-bearing structure
+    /// the walls, doors, and windows attach to. The circulation
+    /// graph (`Floor.skeleton`) only proves rooms connect.
+    pub framing: Framing,
     pub floors: Vec<Floor>,
     /// (ground hall, upper hall) room ids, for two-storey styles.
     pub stairs: Option<(u32, u32)>,

@@ -56,7 +56,8 @@ fn render(house: &House, with_seed: bool) -> String {
     s.push('}');
     // The base is a deterministic function of the footprint, so it
     // carries no variety: it stays out of the plan JSON and rides
-    // only on the seeded form the shell reads.
+    // only on the seeded form the shell reads. The framing is the
+    // same: deterministic from the plan, seeded form only.
     if with_seed {
         s.push_str(",\"base\":{\"rects\":[");
         for (i, r) in house.base.rects.iter().enumerate() {
@@ -69,6 +70,24 @@ fn render(house: &House, with_seed: bool) -> String {
             ));
         }
         s.push_str(&format!("],\"thickness\":{:.2}}}", house.base.thickness));
+        s.push_str(",\"framing\":");
+        s.push_str(&crate::adapters::framing_json::framing_json(house));
+        // The basement is deterministic from the plan, like the base
+        // and framing: seeded form only, never the plan hash.
+        let b = &house.basement;
+        s.push_str(&format!(
+            ",\"basement\":{{\"rect\":{{\"x\":{:.2},\"y\":{:.2},\"w\":{:.2},\"d\":{:.2}}},\"depth\":{:.2},\"stair_from\":{},\"stair_axis\":\"{}\",\"stair_top\":[{:.2},{:.2}],\"stair_run\":{:.2}}}",
+            b.rect.x,
+            b.rect.y,
+            b.rect.w,
+            b.rect.d,
+            b.depth,
+            b.stair_from,
+            axis_name(b.stair_axis),
+            b.stair_top.0,
+            b.stair_top.1,
+            b.stair_run
+        ));
     }
     s.push_str(",\"floors\":[");
     for (i, f) in house.floors.iter().enumerate() {
@@ -151,7 +170,7 @@ fn kind_name(kind: OpeningKind) -> &'static str {
     }
 }
 
-fn axis_name(axis: Axis) -> &'static str {
+pub(crate) fn axis_name(axis: Axis) -> &'static str {
     match axis {
         Axis::Horizontal => "horizontal",
         Axis::Vertical => "vertical",

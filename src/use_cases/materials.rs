@@ -32,6 +32,10 @@ pub const CLUTTER: u32 = 38;
 /// The foundation slab material, appended last so every earlier id
 /// is unchanged.
 pub const CONCRETE: u32 = 39;
+/// The structural framing (studs, plates, joists, rafters): wood,
+/// appended after concrete. The neighborhood grounds derive from
+/// FRAMING, not CONCRETE, so they stay the last ids.
+pub const FRAMING: u32 = 40;
 
 /// The full material table, in id order.
 pub fn material_table() -> Vec<Material> {
@@ -40,7 +44,9 @@ pub fn material_table() -> Vec<Material> {
         Material { name: "ceiling", color: [0.95, 0.95, 0.95] },
         Material { name: "roof", color: [0.32, 0.30, 0.28] },
         Material { name: "stairs", color: [0.55, 0.38, 0.22] },
-        Material { name: "porch", color: [0.70, 0.70, 0.68] },
+        // The porch is a wood deck, not concrete: its colour must
+        // never read as a concrete ground patch.
+        Material { name: "porch", color: [0.55, 0.42, 0.28] },
         Material { name: "living", color: [0.90, 0.80, 0.65] },
         Material { name: "kitchen", color: [0.65, 0.75, 0.85] },
         Material { name: "dining", color: [0.70, 0.85, 0.65] },
@@ -66,6 +72,7 @@ pub fn material_table() -> Vec<Material> {
         Material { name: "leaf", color: [0.28, 0.48, 0.26] },
         Material { name: "clutter", color: [0.60, 0.45, 0.35] },
         Material { name: "concrete", color: [0.62, 0.62, 0.60] },
+        Material { name: "framing", color: [0.72, 0.58, 0.38] },
     ]);
     table
 }
@@ -107,11 +114,12 @@ mod tests {
     #[test]
     fn every_id_has_a_material() {
         let table = material_table();
-        assert_eq!(table.len(), CONCRETE as usize + 1);
+        assert_eq!(table.len(), FRAMING as usize + 1);
         assert_eq!(table[ROOF as usize].name, "roof");
         assert_eq!(table[SIDING as usize].name, "siding");
         assert_eq!(table[CLUTTER as usize].name, "clutter");
         assert_eq!(table[CONCRETE as usize].name, "concrete");
+        assert_eq!(table[FRAMING as usize].name, "framing");
     }
 
     #[test]

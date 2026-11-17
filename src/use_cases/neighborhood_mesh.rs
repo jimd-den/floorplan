@@ -13,20 +13,20 @@ use crate::domain::mesh::{Material, Mesh};
 use crate::domain::neighborhood::{Lot, Neighborhood, Street};
 use crate::use_cases::extrude::{extrude, material_table};
 use crate::use_cases::grounds::add_grounds;
-use crate::use_cases::materials::CONCRETE;
+use crate::use_cases::materials::FRAMING;
 use crate::use_cases::neighborhood::{SIDEWALK_W, STREET_W};
 use crate::use_cases::place_mesh::append_placed;
 use crate::use_cases::ribbon::{add_flat_quad, add_ribbon};
 use crate::use_cases::street_furniture_mesh::{add_lamps, add_signs, furniture_materials};
 
 /// The street material id: the first id after the house table,
-/// whose last id is CONCRETE. Derived, never a literal — appending
+/// whose last id is FRAMING. Derived, never a literal — appending
 /// a house material shifts the neighborhood ids with it.
-pub const STREET_MATERIAL: u32 = CONCRETE + 1;
+pub const STREET_MATERIAL: u32 = FRAMING + 1;
 /// The lot material id, appended after the house table.
-pub const LOT_MATERIAL: u32 = CONCRETE + 2;
+pub const LOT_MATERIAL: u32 = FRAMING + 2;
 /// The sidewalk material id, appended after the house table.
-pub const SIDEWALK_MATERIAL: u32 = CONCRETE + 3;
+pub const SIDEWALK_MATERIAL: u32 = FRAMING + 3;
 
 /// The material table for a neighborhood mesh: the house table
 /// plus street asphalt, lot grass, sidewalk concrete, and street

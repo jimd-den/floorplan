@@ -4,8 +4,10 @@
 //! The front of the house is the south edge (largest y).
 
 pub mod base;
+pub mod basement;
 pub mod chunk;
 pub mod curve;
+pub mod framing;
 pub mod furniture;
 pub mod geometry;
 pub mod haunt;
@@ -18,6 +20,7 @@ pub mod model;
 pub mod neighborhood;
 pub mod placement;
 pub mod polygon;
+pub mod segment;
 pub mod skeleton;
 pub mod spline;
 pub mod street_furniture;
